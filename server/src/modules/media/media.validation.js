@@ -62,6 +62,8 @@ export const detailsParamsSchema = z
     path: ['mediaType']
   });
 
+export const seasonsParamsSchema = z.object({ mediaId: z.string().uuid('mediaId must be a valid id.') });
+
 export const detailsQuerySchema = z.object({
   refresh: z.preprocess((v) => v === '1' || v === 'true', z.boolean())
 });

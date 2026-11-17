@@ -302,3 +302,33 @@ test('TTLCache: expiry, size cap, in-flight de-duplication, failures not cached'
   await assert.rejects(c.getOrLoad('bad', 1000, async () => { throw new Error('x'); }));
   assert.equal(c.get('bad'), undefined);
 });
+
+// ------------------------------------------------- seasons and episodes ---
+
+test('normalizer: TMDB season and episode mapping (blank names get safe fallbacks)', () => {
+  const s0 = n.normalizeTmdbSeason({ season_number: 0, name: '', episode_count: 3 });
+  assert.equal(s0.name, 'Specials');
+  const s2 = n.normalizeTmdbSeason({ season_number: 2, name: ' ', poster_path: '/s.jpg', air_date: '', episodes: [{}, {}] });
+  assert.equal(s2.name, 'Season 2');
+  assert.equal(s2.airDate, null);
+  assert.equal(s2.episodeCount, 2);
+  assert.equal(s2.posterUrl, 'https://image.tmdb.org/t/p/w500/s.jpg');
+  assert.equal(n.normalizeTmdbSeason({ season_number: -1 }), null);
+
+  const ep = n.normalizeTmdbEpisode({ episode_number: 4, name: '', runtime: 0, air_date: '2021-02-03' });
+  assert.deepEqual(ep, { episodeNumber: 4, title: 'Episode 4', overview: null, airDate: '2021-02-03', runtimeMinutes: null });
+  assert.equal(n.normalizeTmdbEpisode({ episode_number: 0 }), null);
+});
+
+test('normalizer: anime episodes are generated 1..N, capped, and aired count is used when total is unknown', () => {
+  const eps = n.buildAnimeEpisodes(3, 24);
+  assert.deepEqual(eps.map((e) => e.title), ['Episode 1', 'Episode 2', 'Episode 3']);
+  assert.equal(eps[0].runtimeMinutes, 24);
+  assert.equal(n.buildAnimeEpisodes(null).length, 0);
+  assert.equal(n.buildAnimeEpisodes(999999).length, n.MAX_GENERATED_EPISODES);
+
+  assert.equal(n.anilistKnownEpisodeCount({ episodes: 12 }), 12);
+  assert.equal(n.anilistKnownEpisodeCount({ episodes: null, nextAiringEpisode: { episode: 8 } }), 7);
+  assert.equal(n.anilistKnownEpisodeCount({ episodes: null, nextAiringEpisode: { episode: 1 } }), null);
+  assert.equal(n.anilistKnownEpisodeCount({}), null);
+});

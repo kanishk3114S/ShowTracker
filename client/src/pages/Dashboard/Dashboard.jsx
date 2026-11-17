@@ -46,7 +46,7 @@ export default function Dashboard() {
               <div className="flex items-center space-x-2">
                 <span className="text-xl font-bold tracking-tight text-white">ShowTracker</span>
                 <span className="text-xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">
-                  Phase 2 Active
+                  Phase 4 Active
                 </span>
               </div>
               <p className="text-xs text-[#9CA3AF]">Logged in as @{username}</p>
@@ -54,6 +54,13 @@ export default function Dashboard() {
           </div>
 
           <div className="flex items-center space-x-3">
+            <Link
+              to="/library"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 hover:bg-red-700 border border-red-500/50 text-white transition-all"
+            >
+              <span>My Library</span>
+            </Link>
+
             <Link
               to="/explore"
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-white transition-all"

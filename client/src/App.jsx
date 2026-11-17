@@ -15,6 +15,7 @@ import Explore from './pages/Explore/Explore';
 import Trending from './pages/Trending/Trending';
 import MediaDetails from './pages/MediaDetails/MediaDetails';
 import Credits from './pages/Credits/Credits';
+import Library from './pages/Library/Library';
 
 export default function App() {
   return (
@@ -60,6 +61,16 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Settings />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Phase 4: personal library */}
+          <Route
+            path="/library"
+            element={
+              <ProtectedRoute>
+                <Library />
               </ProtectedRoute>
             }
           />

@@ -25,17 +25,14 @@ export async function withUserTransaction(verifiedUserId, callback) {
   try {
     await client.query('BEGIN;');
 
-    // Set transaction-local claims so auth.uid() resolves to verifiedUserId
-    await client.query("SELECT set_config('request.jwt.claim.sub', $1, true);", [verifiedUserId]);
-    await client.query("SELECT set_config('request.jwt.claims', $1, true);", [
-      JSON.stringify({
-        sub: verifiedUserId,
-        role: 'authenticated'
-      })
-    ]);
-
-    // Also set app.user_id as standard fallback
-    await client.query("SELECT set_config('app.user_id', $1, true);", [verifiedUserId]);
+    // Set transaction-local claims so auth.uid() resolves to verifiedUserId, plus
+    // app.user_id as a fallback. One query (not three) saves two network round trips per request.
+    await client.query(
+      `SELECT set_config('request.jwt.claim.sub', $1, true),
+              set_config('request.jwt.claims', $2, true),
+              set_config('app.user_id', $1, true);`,
+      [verifiedUserId, JSON.stringify({ sub: verifiedUserId, role: 'authenticated' })]
+    );
 
     const result = await callback(client);
 

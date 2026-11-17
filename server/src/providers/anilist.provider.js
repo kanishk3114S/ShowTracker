@@ -32,6 +32,7 @@ const LIST_FIELDS = `
 const DETAIL_FIELDS = `
   ${LIST_FIELDS}
   duration
+  nextAiringEpisode { episode }
   endDate { year month day }
   studios(isMain: true) { nodes { name } }
   relations {

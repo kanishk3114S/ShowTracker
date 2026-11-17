@@ -5,7 +5,9 @@ import {
   getMediaDetails,
   getGenreOptions
 } from '../../services/mediaCatalog.service.js';
+import { getSeasonsForMedia } from '../../services/episodeCatalog.service.js';
 import {
+  seasonsParamsSchema,
   searchQuerySchema,
   trendingQuerySchema,
   genresQuerySchema,
@@ -56,6 +58,16 @@ export async function genres(req, res, next) {
     const params = parseOrThrow(genresQuerySchema, req.query, 'Invalid genre parameters.');
     const data = await getGenreOptions(params);
     res.set('Cache-Control', PUBLIC_CACHE).json({ success: true, data });
+  } catch (err) {
+    next(withRetryHeader(res, err));
+  }
+}
+
+export async function seasons(req, res, next) {
+  try {
+    const { mediaId } = parseOrThrow(seasonsParamsSchema, req.params, 'Invalid media id.');
+    const data = await getSeasonsForMedia(mediaId);
+    res.set('Cache-Control', 'private, no-store').json({ success: true, data });
   } catch (err) {
     next(withRetryHeader(res, err));
   }

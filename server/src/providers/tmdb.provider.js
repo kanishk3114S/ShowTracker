@@ -118,6 +118,10 @@ export async function discoverTv({ page = 1, genreId, year } = {}) {
 export const getMovieDetails = (id) => tmdbGet(`/movie/${encodeURIComponent(id)}`);
 export const getTvDetails = (id) => tmdbGet(`/tv/${encodeURIComponent(id)}`);
 
+/** One season of a TV show, including its episode list. */
+export const getTvSeasonDetails = (tvId, seasonNumber) =>
+  tmdbGet(`/tv/${encodeURIComponent(tvId)}/season/${encodeURIComponent(seasonNumber)}`);
+
 /** `mediaType`: 'movie' | 'tv'. `window`: 'day' | 'week'. */
 export async function getTrending({ mediaType, window = 'week', page = 1 } = {}) {
   return toPage(await tmdbGet(`/trending/${mediaType}/${window}`, { page: clampPage(page) }));

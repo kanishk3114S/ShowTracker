@@ -28,7 +28,8 @@ Discover anime, movies and TV shows from one cinematic interface, powered by rea
 | 🔥 **Trending** lists (TMDB daily/weekly, AniList trending ranking) | ✅ Done |
 | 🎞️ **Detail pages** with posters, backdrops, genres, ratings, runtime, seasons and related anime | ✅ Done |
 | 🗂️ **Shared media catalog** stored in PostgreSQL as titles are opened | ✅ Done |
-| 📚 Personal library, watch status, episode progress, ratings | 🛠️ Planned (Phase 4) |
+| 📚 **Personal library**: watch status, ratings, favorites, private notes | ✅ Done |
+| ✅ **Episode tracking** for anime and TV (seasons, per-episode and per-season, auto status) | ✅ Done |
 | 🌐 Public library sharing, followers, social features | 🛠️ Planned (Phase 5+) |
 
 ---
@@ -197,6 +198,25 @@ All media endpoints are public `GET` requests. Responses look like `{ "success":
 
 Search and trending return `groups` (one per media type), so one failing provider never hides the others. Provider errors are normalized (`PROVIDER_RATE_LIMITED`, `PROVIDER_UNAVAILABLE`, `MEDIA_NOT_FOUND`, …).
 
+### Library & episode tracking (signed-in users only)
+
+Send `Authorization: Bearer <supabase access token>`. All data is private (`Cache-Control: no-store`).
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/library?status=&mediaType=&sort=updated_at\|title\|rating\|release_date&order=` | Your library with derived progress (`watchedEpisodesCount` / `totalEpisodes`) |
+| `GET /api/library/check/:mediaId` | Your entry for a title (or `null`) plus watched episode ids |
+| `POST /api/library` | Add `{ mediaId, status?, rating?, isFavorite?, notes? }`. Duplicate returns `409` |
+| `PATCH /api/library/:id` | Update status, rating (0-10), favorite, notes |
+| `DELETE /api/library/:id` | Remove from your library (deletes your progress, never catalog data) |
+| `GET /api/media/:mediaId/seasons` | Seasons and episodes (loaded from TMDB/AniList on first use) |
+| `POST` / `DELETE /api/library/:id/episodes/:episodeId/watched` | Mark an episode watched / unwatched |
+| `POST /api/library/:id/seasons/:seasonId/watched` | Mark a whole season watched |
+
+`mediaId` is the `catalogId` returned by the details endpoint. Rules enforced by the API: movies never get episode progress (`CANNOT_TRACK_EPISODES_FOR_MOVIE`), an episode must belong to the entry's own title (`INVALID_EPISODE_FOR_MEDIA`), counts are always derived with `COUNT(*)`, and specials (season 0) don't count toward progress. Status moves automatically: first watched episode makes *Plan to Watch* become *Watching*; finishing every regular episode makes it *Completed*; un-watching one reverts it to *Watching*.
+
+TMDB supplies real seasons and episodes. AniList has no per-episode data, so anime gets `Season 1` with `Episode 1..N` generated from its episode count (or the episodes already aired for a running show).
+
 Account endpoints: `GET /api/auth/me`, `PATCH /api/profiles/me`, `GET /api/profiles/username-availability`, `GET /api/users/:username`.
 
 ### Caching & rate limits
@@ -213,15 +233,23 @@ AniList documents 90 requests/minute (currently degraded to 30). The adapter rea
 |---|---|
 | [`001_create_profiles_and_rls.sql`](supabase/migrations/001_create_profiles_and_rls.sql) | `profiles`, RLS policies, auto-profile trigger |
 | [`002_create_media_catalog.sql`](supabase/migrations/002_create_media_catalog.sql) | `media_items`, `media_sources`, `genres`, `media_genres` |
+| [`003_create_seasons_and_episodes.sql`](supabase/migrations/003_create_seasons_and_episodes.sql) | `seasons`, `episodes` (shared catalog) |
+| [`004_create_user_library_and_progress.sql`](supabase/migrations/004_create_user_library_and_progress.sql) | `user_library`, `user_episode_progress` (per-user, RLS forced) |
 
 ```mermaid
 erDiagram
     media_items ||--o{ media_sources : "provider ids"
     media_items ||--o{ media_genres : "tagged"
     genres ||--o{ media_genres : "used by"
+    media_items ||--o{ seasons : has
+    seasons ||--o{ episodes : has
+    profiles ||--o{ user_library : owns
+    media_items ||--o{ user_library : "tracked as"
+    user_library ||--o{ user_episode_progress : records
+    episodes ||--o{ user_episode_progress : "watched"
 ```
 
-The catalog is **shared** data (one row per title). Personal tracking data will live in separate user-scoped tables later. Full schema, keys, many-to-many explanation and example queries: [`DB_Schema.MD`](DB_Schema.MD).
+The catalog (including seasons and episodes) is **shared** data: one row per title, the same for everyone. Library and progress rows are **per user** and protected by Row Level Security, so a user can only ever read or change their own. Full schema, keys, many-to-many explanation and example queries: [`DB_Schema.MD`](DB_Schema.MD).
 
 **Security model:** the API connects as `showtracker_app`, which cannot bypass Row Level Security. User identity is set per transaction (`withUserTransaction`) and never leaks between pooled connections. `anon` and `authenticated` have no direct access to catalog tables.
 
@@ -231,7 +259,7 @@ The catalog is **shared** data (one row per title). Personal tracking data will 
 
 ```bash
 cd server
-npm test            # existing API tests + 16 mocked media tests (no network, no database)
+npm test            # API tests + mocked media tests + library integration tests (needs the database; ~2-3 min)
 npm run test:db     # real-database checks for migration 002 (constraints, grants, upserts)
 npm run test:live   # REAL AniList and TMDB calls + catalog persistence (TMDB needs a token)
 
@@ -239,6 +267,8 @@ cd ../client
 npm run build       # production build
 npm run lint
 ```
+
+`test/library.test.js` runs the real routes, SQL and Row Level Security as the `showtracker_app` role with two disposable users (authentication and provider HTTP are substituted; the users and test titles are deleted afterwards).
 
 Mocked tests prove our logic; `test:live` proves the providers actually respond as expected. They are reported separately on purpose.
 
@@ -282,5 +312,5 @@ Movie and TV data, posters and ratings come from [TMDB](https://www.themoviedb.o
 ---
 
 <div align="center">
-<sub>Built with React, Express and PostgreSQL · Phase 3 complete</sub>
+<sub>Built with React, Express and PostgreSQL · Phase 4 complete</sub>
 </div>

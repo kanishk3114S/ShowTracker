@@ -353,3 +353,86 @@ JOIN media_genres mg ON mg.genre_id = g.id
 JOIN media_items mi ON mi.id = mg.media_id
 WHERE LOWER(g.name) = 'drama';
 ```
+
+
+---
+
+## Phase 4: Seasons, Episodes and the Personal Library (migrations 003 and 004)
+
+### Shared vs personal data
+
+- `seasons` and `episodes` (003) are **shared catalog** data, like `media_items`. They are loaded from TMDB (TV) or generated from AniList's episode count (anime) the first time a user needs them. Movies never have them. Season 0 is allowed for TMDB "Specials".
+- `user_library` and `user_episode_progress` (004) are **personal** data. Each row belongs to one user, and Row Level Security (enabled **and forced**) makes every query see only that user's rows.
+
+```mermaid
+erDiagram
+    media_items ||--o{ seasons : has
+    seasons ||--o{ episodes : has
+    profiles ||--o{ user_library : owns
+    media_items ||--o{ user_library : "tracked as"
+    user_library ||--o{ user_episode_progress : records
+    episodes ||--o{ user_episode_progress : "watched"
+
+    seasons {
+        uuid id PK
+        uuid media_id FK
+        int season_number "unique per media; 0 = specials"
+        text name
+        int episode_count
+    }
+    episodes {
+        uuid id PK
+        uuid season_id FK
+        int episode_number "unique per season"
+        text title
+        date air_date
+        int runtime_minutes
+    }
+    user_library {
+        uuid id PK
+        uuid user_id FK
+        uuid media_id FK "unique with user_id"
+        text status
+        numeric rating "0-10"
+        bool is_favorite
+        text notes "max 2000"
+        timestamptz started_at
+        timestamptz completed_at
+        int rewatch_count
+    }
+    user_episode_progress {
+        uuid user_library_id PK,FK
+        uuid episode_id PK,FK
+        timestamptz watched_at
+    }
+```
+
+### Concepts
+
+- **Composite primary key** on `user_episode_progress (user_library_id, episode_id)`: marking an episode watched twice is impossible, so the operation is naturally idempotent (`ON CONFLICT DO NOTHING`).
+- **Derived counts**: nothing stores "episodes watched". It is always `COUNT(*)` over `user_episode_progress`, so it cannot drift out of sync.
+- **ON DELETE rules**: removing a library entry cascades to its progress; removing a user cascades to their library; `media_items` use `RESTRICT` so shared catalog rows can never vanish from under someone's library.
+- **Ownership through a parent**: progress rows have no `user_id`; their policy checks that the parent `user_library` row belongs to `auth.uid()`.
+- **Transactions**: every library request runs in `withUserTransaction`, which sets the verified user id for that transaction only. The entry row is locked (`SELECT ... FOR UPDATE`) while progress changes so concurrent clicks cannot corrupt status.
+
+### Example queries
+
+```sql
+-- A user's progress per title
+SELECT mi.title, COUNT(uep.episode_id) AS watched
+FROM user_library ul
+JOIN media_items mi ON mi.id = ul.media_id
+LEFT JOIN user_episode_progress uep ON uep.user_library_id = ul.id
+WHERE ul.user_id = '<user uuid>'
+GROUP BY mi.title;
+
+-- Episodes of a show with watched state for one library entry
+SELECT s.season_number, e.episode_number, e.title,
+       (uep.episode_id IS NOT NULL) AS watched
+FROM seasons s
+JOIN episodes e ON e.season_id = s.id
+LEFT JOIN user_episode_progress uep
+       ON uep.episode_id = e.id AND uep.user_library_id = '<entry uuid>'
+WHERE s.media_id = '<media uuid>'
+ORDER BY s.season_number, e.episode_number;
+```

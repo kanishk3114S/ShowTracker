@@ -28,6 +28,11 @@ export default function AppHeader() {
             <NavLink to="/trending" className={linkClass}>
               Trending
             </NavLink>
+            {isAuthenticated && (
+              <NavLink to="/library" className={linkClass}>
+                My Library
+              </NavLink>
+            )}
           </nav>
         </div>
         {!loading && (

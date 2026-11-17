@@ -1291,3 +1291,14 @@ ShowTracker's first successful release is not measured by the number of pages or
 - "Add to library" is shown disabled and labelled "coming soon".
 
 **Out of scope (Phase 4+):** user library, watch status, episode progress, seasons/episodes tables, user ratings, favorites, history, stats, collections, social features, recommendations, Redis.
+
+
+---
+
+## Phase 4 (Implemented): Seasons, Episodes and Personal Library
+
+**Delivered:** library CRUD (status, 0-10 rating, favorite, private notes); episode tracking for anime and TV (per episode and per season); automatic status (Plan to Watch to Watching on the first episode, to Completed on the last, back to Watching if one is un-watched); movies tracked as Watched/Completed with no episode controls; `/library` page with status tabs, type filter, sorting and progress bars; tracking panel and episode list on the details page.
+
+**Rules:** progress counts are derived (`COUNT(*)`), never stored; specials (season 0) do not count toward progress or completion; episode sync never deletes episodes; all data is private to its owner via forced RLS.
+
+**Known limits:** AniList has no per-episode data, so anime episodes are generated (`Episode N`) from the episode count or aired count; a show whose episode count AniList has not published yet has no episode list until it does. Public sharing of libraries, statistics and social features remain out of scope (Phase 5+).

@@ -194,6 +194,61 @@ export function normalizeTmdbMedia(raw, mediaType, genreMap = new Map()) {
   return media;
 }
 
+// ------------------------------------------------- seasons and episodes ---
+
+const positiveIntOrNull = (value) => (Number.isInteger(value) && value > 0 ? value : null);
+
+/** TMDB season summary (from the TV details `seasons` array or a season response). */
+export function normalizeTmdbSeason(raw) {
+  if (!raw || !Number.isInteger(raw.season_number) || raw.season_number < 0) return null;
+  const count = Number.isInteger(raw.episode_count) ? raw.episode_count : raw.episodes?.length;
+  return {
+    seasonNumber: raw.season_number,
+    name: nullIfBlank(raw.name) ?? (raw.season_number === 0 ? 'Specials' : `Season ${raw.season_number}`),
+    overview: nullIfBlank(raw.overview),
+    posterUrl: tmdbImage(TMDB_POSTER_BASE, raw.poster_path),
+    airDate: normalizeIsoDate(raw.air_date),
+    episodeCount: Number.isInteger(count) && count >= 0 ? count : null
+  };
+}
+
+/** TMDB episode. Blank titles become "Episode N" so the NOT NULL title column is always valid. */
+export function normalizeTmdbEpisode(raw) {
+  const episodeNumber = positiveIntOrNull(raw?.episode_number);
+  if (!episodeNumber) return null;
+  return {
+    episodeNumber,
+    title: nullIfBlank(raw.name) ?? `Episode ${episodeNumber}`,
+    overview: nullIfBlank(raw.overview),
+    airDate: normalizeIsoDate(raw.air_date),
+    runtimeMinutes: positiveIntOrNull(raw.runtime)
+  };
+}
+
+export const MAX_GENERATED_EPISODES = 2000;
+
+/** AniList has no per-episode data, so episodes 1..N are generated (titled "Episode N"). */
+export function buildAnimeEpisodes(count, runtimeMinutes = null) {
+  const n = Math.min(positiveIntOrNull(count) ?? 0, MAX_GENERATED_EPISODES);
+  return Array.from({ length: n }, (_, i) => ({
+    episodeNumber: i + 1,
+    title: `Episode ${i + 1}`,
+    overview: null,
+    airDate: null,
+    runtimeMinutes: positiveIntOrNull(runtimeMinutes)
+  }));
+}
+
+/**
+ * Episodes AniList can vouch for: the official count, or (for a show still
+ * airing with no total yet) the number of episodes already aired.
+ */
+export function anilistKnownEpisodeCount(raw) {
+  if (positiveIntOrNull(raw?.episodes)) return raw.episodes;
+  const next = raw?.nextAiringEpisode?.episode;
+  return Number.isInteger(next) && next > 1 ? next - 1 : null;
+}
+
 /** Normalize a page of provider results and drop entries that could not be normalized. */
 export const compact = (items) => items.filter(Boolean);
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Star, ExternalLink, ImageOff, Lock } from 'lucide-react';
+import { ArrowLeft, Star, ExternalLink, ImageOff } from 'lucide-react';
+import LibraryTracker from '../../components/library/LibraryTracker';
 import AppHeader from '../../components/layout/AppHeader';
 import AppFooter from '../../components/layout/AppFooter';
 import ProviderErrorState from '../../components/media/ProviderErrorState';
@@ -154,15 +155,9 @@ export default function MediaDetails() {
                   <Fact label="Studio" value={media.studios?.length ? media.studios.join(', ') : null} />
                 </dl>
 
-                <div className="mt-8 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    disabled
-                    title="Library tracking arrives in a later phase"
-                    className="inline-flex cursor-not-allowed items-center gap-2 rounded-lg border border-[#2A3245] bg-[#151922] px-4 py-2 text-sm font-medium text-[#6B7280]"
-                  >
-                    <Lock className="h-4 w-4" /> Add to library <span className="text-xs">(coming soon)</span>
-                  </button>
+                <LibraryTracker key={`${media.provider}:${media.mediaType}:${media.externalId}`} media={media} />
+
+                <div className="mt-6 flex flex-wrap items-center gap-3">
                   {media.sourceUrl && (
                     <a
                       href={media.sourceUrl}
