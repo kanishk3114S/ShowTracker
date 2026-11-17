@@ -55,7 +55,7 @@ export default function Health() {
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center shadow-lg shadow-red-900/30">
+            <div className="w-10 h-10 rounded-xl bg-[#F2B33D] flex items-center justify-center">
               <Film className="w-5 h-5 text-white" />
             </div>
             <div>
@@ -90,7 +90,7 @@ export default function Health() {
       <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8 space-y-8">
         
         {/* Status Hero Banner */}
-        <section className="bg-gradient-to-r from-[#151922] via-[#1C2230] to-[#151922] border border-[#2A3245] rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+        <section className="bg-[#111113] border border-[#2A2A30] rounded-2xl p-6 md:p-8 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-96 h-96 bg-red-600/5 rounded-full blur-3xl pointer-events-none" />
           
           <div className="relative z-10 space-y-3">
@@ -115,7 +115,7 @@ export default function Health() {
           {/* Node 1: React Frontend */}
           <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-4 hover:border-[#3B455E] transition-all">
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-cyan-950/70 border border-cyan-800/60 flex items-center justify-center text-cyan-400">
+              <div className="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-[#F2B33D]">
                 <Radio className="w-5 h-5" />
               </div>
               <span className="inline-flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-emerald-950/80 border border-emerald-800/60 text-emerald-400">
@@ -150,7 +150,7 @@ export default function Health() {
           {/* Node 2: Express Backend */}
           <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-4 hover:border-[#3B455E] transition-all">
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-indigo-950/70 border border-indigo-800/60 flex items-center justify-center text-indigo-400">
+              <div className="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-[#F2B33D]">
                 <Server className="w-5 h-5" />
               </div>
               {loading ? (
@@ -199,7 +199,7 @@ export default function Health() {
           {/* Node 3: PostgreSQL Database */}
           <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-4 hover:border-[#3B455E] transition-all">
             <div className="flex items-center justify-between">
-              <div className="w-10 h-10 rounded-xl bg-blue-950/70 border border-blue-800/60 flex items-center justify-center text-blue-400">
+              <div className="w-10 h-10 rounded-xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-[#F2B33D]">
                 <Database className="w-5 h-5" />
               </div>
               {loading ? (

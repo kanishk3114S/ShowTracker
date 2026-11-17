@@ -21,6 +21,7 @@ export function HeroBackdrop({ media }) {
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-ink-base via-ink-base/70 to-ink-base/10" />
       <div className="absolute inset-0 bg-gradient-to-r from-ink-base/70 via-transparent to-ink-base/40" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(9,9,11,0.85)_100%)]" />
     </div>
   );
 }

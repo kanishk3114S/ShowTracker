@@ -36,7 +36,7 @@ export default function LibraryFilters({ status, mediaType, sortKey, counts, onC
           <select
             value={sortKey}
             onChange={(e) => onChange({ sort: e.target.value === 'recent' ? '' : e.target.value })}
-            className="h-9 rounded-lg border border-ink-edge bg-ink-surface px-2.5 text-sm text-fg outline-none focus:border-copper/70"
+            className="h-9 rounded-lg border border-ink-edge bg-ink-surface px-2.5 text-sm text-fg outline-none focus:border-accent/60"
           >
             {Object.entries(SORTS).map(([key, s]) => (
               <option key={key} value={key}>

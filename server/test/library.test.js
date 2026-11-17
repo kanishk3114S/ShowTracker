@@ -369,6 +369,47 @@ test('isolation: a transaction identity does not leak to the next pooled connect
   assert.ok(!leaked.rows[0].sub, 'claim is cleared after the transaction');
 });
 
+test('transactions: invalid user ids are rejected before any SQL is built', async () => {
+  for (const bad of ["x'); DROP TABLE public.profiles; --", 'not-a-uuid', '', null, undefined, 12345]) {
+    await assert.rejects(withUserTransaction(bad, (c) => c.query('SELECT 1')), /UUID|requires/i, String(bad));
+  }
+});
+
+test('transactions: read-only transactions (COMMIT not awaited) never leak identity to other connections', async () => {
+  // Run several read-only transactions, then probe every pooled connection concurrently.
+  await Promise.all(
+    Array.from({ length: 6 }, () => withUserTransaction(userA, (c) => c.query('SELECT 1'), { readOnly: true }))
+  );
+  const probes = await Promise.all(
+    Array.from({ length: 8 }, () => pool.query(`SELECT current_setting('request.jwt.claim.sub', true) AS sub, current_setting('app.user_id', true) AS uid`))
+  );
+  for (const p of probes) {
+    assert.ok(!p.rows[0].sub, 'claim cleared');
+    assert.ok(!p.rows[0].uid, 'app.user_id cleared');
+  }
+});
+
+test('transactions: a read-only transaction still sees the right user and a failing one rolls back', async () => {
+  const seen = await withUserTransaction(
+    userA,
+    (c) => c.query(`SELECT current_setting('request.jwt.claim.sub', true) AS sub, current_setting('request.jwt.claims', true)::json->>'role' AS role`),
+    { readOnly: true }
+  );
+  assert.equal(seen.rows[0].sub, userA);
+  assert.equal(seen.rows[0].role, 'authenticated');
+  // ...and RLS really does see that identity: user A can read their own library entry through the read-only path
+  const own = await withUserTransaction(userA, (c) => c.query('SELECT COUNT(*)::int AS n FROM public.user_library'), { readOnly: true });
+  assert.ok(own.rows[0].n >= 1);
+  const other = await withUserTransaction(userB, (c) => c.query('SELECT COUNT(*)::int AS n FROM public.user_library WHERE user_id = $1', [userA]), { readOnly: true });
+  assert.equal(other.rows[0].n, 0);
+  await assert.rejects(
+    withUserTransaction(userA, (c) => c.query('SELECT * FROM public.table_that_does_not_exist'), { readOnly: true })
+  );
+  // the connection is usable and clean afterwards
+  const after = await pool.query(`SELECT current_setting('request.jwt.claim.sub', true) AS sub`);
+  assert.ok(!after.rows[0].sub);
+});
+
 // -------------------------------------------------- season/episode sync ---
 
 const jsonResponse = (body, status = 200) =>

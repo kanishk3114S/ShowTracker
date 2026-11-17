@@ -11,8 +11,8 @@ import EmptyState from '../../components/media/EmptyState';
 import Pagination from '../../components/media/Pagination';
 import Tabs from '../../components/ui/Tabs';
 import { PosterGridSkeleton } from '../../components/ui/Skeleton';
-import { searchMedia, getMediaGenres } from '../../services/api';
-import { useApiResource } from '../../hooks/useApiResource';
+import { R } from '../../services/resources';
+import { useResource } from '../../hooks/useApiResource';
 import { useDebounce } from '../../hooks/useDebounce';
 
 const MIN_QUERY = 2;
@@ -56,11 +56,8 @@ export default function Explore() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appliedQuery]);
 
-  const { data, error, loading, reload } = useApiResource(
-    (signal) => searchMedia({ q, type, page, genre: genres, year }, signal),
-    [q, type, page, genreParam, year]
-  );
-  const genreList = useApiResource((signal) => getMediaGenres(type, signal), [type]);
+  const { data, error, loading, reload } = useResource(R.search({ q, type, page, genre: genres, year }));
+  const genreList = useResource(R.genres(type));
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -104,7 +101,7 @@ export default function Explore() {
             <select
               value={year}
               onChange={(e) => update({ year: e.target.value })}
-              className="h-9 rounded-lg border border-ink-edge bg-ink-surface px-2.5 text-sm text-fg outline-none focus:border-copper/70"
+              className="h-9 rounded-lg border border-ink-edge bg-ink-surface px-2.5 text-sm text-fg outline-none focus:border-accent/60"
             >
               <option value="">Any</option>
               {YEARS.map((y) => (

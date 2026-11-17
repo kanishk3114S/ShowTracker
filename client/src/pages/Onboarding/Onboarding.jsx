@@ -12,7 +12,7 @@ import { Reveal } from '../../components/ui/motion';
 const USERNAME_REGEX = /^[a-z0-9_]{3,30}$/;
 
 const fieldClass =
-  'h-12 w-full rounded-xl border border-ink-edge bg-ink-surface px-4 text-[15px] text-fg placeholder-fg-subtle outline-none transition focus:border-copper/70 focus:ring-2 focus:ring-copper/20';
+  'h-12 w-full rounded-xl border border-ink-edge bg-ink-surface px-4 text-[15px] text-fg placeholder-fg-subtle outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20';
 
 export default function Onboarding() {
   const { user, profile, refreshProfile } = useAuth();
@@ -100,8 +100,8 @@ export default function Onboarding() {
   const canSubmit = Boolean(cleaned) && isAvailable === true && !checkingUsername && !submitting;
 
   return (
-    <div className="min-h-screen bg-ink-base text-fg">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(50%_40%_at_70%_20%,rgba(224,122,95,0.10),transparent)]" aria-hidden="true" />
+    <div className="min-h-screen text-fg">
+      <div className="pointer-events-none fixed inset-0 bg-dots mask-radial opacity-60" aria-hidden="true" />
       <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-8 sm:px-6">
         <Logo to="/" />
 
@@ -175,7 +175,7 @@ export default function Onboarding() {
           <Reveal delay={0.1}>
             <p className="mb-3 text-xs font-medium uppercase tracking-wider text-fg-subtle">Live preview</p>
             <Card className="relative overflow-hidden" padded={false}>
-              <div className="h-24 bg-gradient-to-br from-copper/30 via-ink-raised to-ink-surface" aria-hidden="true" />
+              <div className="bg-dots h-24 border-b border-white/[0.06] bg-ink-raised" aria-hidden="true" />
               <div className="px-6 pb-6">
                 <Avatar src={avatarUrl} name={previewName} size="xl" className="-mt-12 border-4 border-ink-surface" />
                 <p className="mt-3 truncate text-xl font-bold text-fg">{previewName}</p>

@@ -109,14 +109,9 @@ export async function loadPublicProfile({ username, callerId, filters }) {
       const { rows } = await client.query(findProfileSql, [username]);
       if (rows.length === 0) return { profile: null, ownerData: null };
       if (rows[0].id !== callerId) return { profile: rows[0], ownerData: null };
-      return {
-        profile: rows[0],
-        ownerData: {
-          library: await listLibrary(client, callerId, filters),
-          stats: await getOwnerStats(client, callerId)
-        }
-      };
-    }));
+      const [library, stats] = await Promise.all([listLibrary(client, callerId, filters), getOwnerStats(client, callerId)]);
+      return { profile: rows[0], ownerData: { library, stats } };
+    }, { readOnly: true }));
   } else {
     const { rows } = await query(findProfileSql, [username]);
     profile = rows[0] ?? null;

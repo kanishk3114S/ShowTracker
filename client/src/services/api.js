@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { supabase } from '../lib/supabase';
+import { invalidateUserData } from '../lib/queryCache';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
@@ -63,6 +64,7 @@ export async function checkUsernameAvailability(username) {
  */
 export async function updateMyProfile(profileData) {
   const res = await apiClient.patch('/profiles/me', profileData);
+  invalidateUserData();
   return res.data;
 }
 
@@ -153,16 +155,19 @@ export async function getRecentlyUpdated(signal) {
 
 export async function addToLibrary(payload) {
   const res = await apiClient.post('/library', payload);
+  invalidateUserData();
   return res.data.data;
 }
 
 export async function updateLibraryEntry(id, payload) {
   const res = await apiClient.patch(`/library/${encodeURIComponent(id)}`, payload);
+  invalidateUserData();
   return res.data.data;
 }
 
 export async function removeFromLibrary(id) {
   const res = await apiClient.delete(`/library/${encodeURIComponent(id)}`);
+  invalidateUserData();
   return res.data.data;
 }
 
@@ -173,16 +178,19 @@ export async function getMediaSeasons(mediaId, signal) {
 
 export async function markEpisodeWatched(entryId, episodeId) {
   const res = await apiClient.post(`/library/${entryId}/episodes/${episodeId}/watched`);
+  invalidateUserData();
   return res.data.data;
 }
 
 export async function markEpisodeUnwatched(entryId, episodeId) {
   const res = await apiClient.delete(`/library/${entryId}/episodes/${episodeId}/watched`);
+  invalidateUserData();
   return res.data.data;
 }
 
 export async function markSeasonWatched(entryId, seasonId) {
   const res = await apiClient.post(`/library/${entryId}/seasons/${seasonId}/watched`);
+  invalidateUserData();
   return res.data.data;
 }
 

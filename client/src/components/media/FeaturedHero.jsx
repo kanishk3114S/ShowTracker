@@ -11,7 +11,7 @@ export default function FeaturedHero({ media, label }) {
   if (!media) return null;
   const art = media.backdropUrl || media.posterUrl;
   return (
-    <section aria-label="Number one trending title" className="relative overflow-hidden rounded-2xl border border-ink-edge bg-ink-surface">
+    <section aria-label="Number one trending title" className="relative overflow-hidden rounded-3xl border border-white/10 bg-ink-surface shadow-glass">
       <PosterImage
         src={art}
         alt=""
@@ -22,6 +22,7 @@ export default function FeaturedHero({ media, label }) {
       />
       <div className="absolute inset-0 bg-gradient-to-t from-ink-base via-ink-base/70 to-ink-base/10" />
       <div className="absolute inset-0 bg-gradient-to-r from-ink-base/90 via-ink-base/40 to-transparent" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_40%,rgba(9,9,11,0.7)_100%)]" />
       <div className="relative flex min-h-[18rem] flex-col justify-end gap-3 p-6 sm:min-h-[22rem] sm:p-10">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone="copper">

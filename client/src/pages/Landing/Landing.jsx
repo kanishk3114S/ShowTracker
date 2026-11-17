@@ -1,45 +1,42 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowRight, BarChart3, Check, Compass, Eye, Lock, Sparkles } from 'lucide-react';
+import { ArrowRight, BarChart3, Check, Compass, Eye, Library, Lock, Sparkles, Tv } from 'lucide-react';
 import Container from '../../components/layout/Container';
 import Button from '../../components/ui/Button';
-import Badge from '../../components/ui/Badge';
+import Card from '../../components/ui/Card';
+import { CategoryBadge } from '../../components/ui/Badge';
 import PosterImage from '../../components/media/PosterImage';
 import ProgressBar from '../../components/ui/ProgressBar';
 import { Reveal } from '../../components/ui/motion';
 import { useSignIn } from '../../components/auth/SignInContext';
 import { useTrendingArtwork } from '../../hooks/useTrendingArtwork';
-import { TYPE_LABELS } from '../../components/media/mediaUtils';
 
-/** Real trending posters in three offset columns. Renders nothing if the artwork API is unavailable. */
+/** Real trending posters in three tilted, floating columns. Renders nothing if the artwork API is unavailable. */
 function HeroCollage({ posters }) {
   const picks = posters.slice(0, 9);
   if (picks.length < 6) return null;
   const columns = [picks.filter((_, i) => i % 3 === 0), picks.filter((_, i) => i % 3 === 1), picks.filter((_, i) => i % 3 === 2)];
-  const offsets = ['mt-0', 'mt-12', 'mt-4'];
-  const drift = [-10, 12, -6];
+  const offsets = ['mt-0', 'mt-14', 'mt-5'];
+  const drift = [-12, 14, -8];
 
   return (
     <div className="relative mx-auto w-full max-w-md lg:max-w-none" aria-hidden="true">
-      <div className="absolute -inset-10 rounded-full bg-copper/10 blur-3xl" />
-      <div className="relative grid grid-cols-3 gap-3 sm:gap-4">
+      <div className="relative grid grid-cols-3 gap-3 [perspective:1400px] sm:gap-4">
         {columns.map((col, c) => (
           <motion.div
             key={c}
-            className={`space-y-3 sm:space-y-4 ${offsets[c]}`}
+            className={`space-y-3 [transform:rotateY(-14deg)_rotateX(5deg)] sm:space-y-4 ${offsets[c]}`}
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.15 * c, ease: [0.22, 1, 0.36, 1] }}
           >
             <motion.div animate={{ y: [0, drift[c], 0] }} transition={{ duration: 9 + c * 2, repeat: Infinity, ease: 'easeInOut' }} className="space-y-3 sm:space-y-4">
               {col.map((m) => (
-                <PosterImage
-                  key={`${m.provider}:${m.externalId}`}
-                  src={m.posterUrl}
-                  alt=""
-                  className="aspect-[2/3] rounded-xl border border-ink-edge shadow-lift"
-                />
+                <div key={`${m.provider}:${m.externalId}`} className="relative">
+                  <PosterImage src={m.posterUrl} alt="" className="aspect-[2/3] rounded-2xl border border-white/10 shadow-lift" />
+                  <CategoryBadge type={m.mediaType} className="absolute left-2 top-2" />
+                </div>
               ))}
             </motion.div>
           </motion.div>
@@ -50,13 +47,91 @@ function HeroCollage({ posters }) {
   );
 }
 
-function FeatureHeading({ eyebrow, title, children }) {
+/** Micro-preview: episodes tick off one after another, with the progress bar following. */
+function TickDemo() {
+  const [done, setDone] = useState(1);
+  useEffect(() => {
+    const id = setInterval(() => setDone((n) => (n >= 4 ? 0 : n + 1)), 1500);
+    return () => clearInterval(id);
+  }, []);
   return (
-    <div className="max-w-xl">
-      <p className="text-sm font-semibold text-copper">{eyebrow}</p>
-      <h2 className="mt-2 text-3xl font-bold tracking-tight text-fg sm:text-4xl">{title}</h2>
-      <p className="mt-4 text-base leading-relaxed text-fg-muted">{children}</p>
+    <div className="mt-5 space-y-2" aria-hidden="true">
+      <ProgressBar value={done} max={4} label="Example progress" />
+      {[1, 2, 3, 4].map((n) => {
+        const ticked = n <= done;
+        return (
+          <div
+            key={n}
+            className={`flex items-center gap-3 rounded-xl border px-3 py-2 transition-colors duration-300 ${
+              ticked ? 'border-accent/25 bg-accent/[0.06]' : 'border-white/10 bg-white/[0.03]'
+            }`}
+          >
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-full border transition-colors ${
+                ticked ? 'border-accent bg-accent text-ink-base' : 'border-white/20'
+              }`}
+            >
+              {ticked && <Check key={`${n}-${done}`} className="h-3 w-3 animate-check-pop" strokeWidth={3.5} />}
+            </span>
+            <span className="text-sm text-fg-muted">Episode {n}</span>
+          </div>
+        );
+      })}
     </div>
+  );
+}
+
+function CatalogPreview({ trio }) {
+  if (trio.length < 3) return null;
+  return (
+    <div className="mt-5 flex items-end justify-center" aria-hidden="true">
+      {trio.map((m, i) => (
+        <div key={m.mediaType} className={`relative w-[30%] ${i === 1 ? 'z-10 -mx-3 -translate-y-2' : ''}`}>
+          <PosterImage src={m.posterUrl} alt="" className="aspect-[2/3] rounded-xl border border-white/10 shadow-lift" />
+          <CategoryBadge type={m.mediaType} className="absolute -bottom-2 left-1/2 -translate-x-1/2" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatsPreview() {
+  const bars = [
+    { w: '86%', l: 'Titles' },
+    { w: '64%', l: 'Episodes' },
+    { w: '78%', l: 'Rating' }
+  ];
+  return (
+    <div className="mt-5 space-y-3" aria-hidden="true">
+      {bars.map((b) => (
+        <div key={b.l}>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle">{b.l}</p>
+          <div className="h-1.5 rounded-full bg-white/[0.09]">
+            <div className="h-full rounded-full bg-accent" style={{ width: b.w }} />
+          </div>
+        </div>
+      ))}
+      <p className="pt-1 text-[11px] text-fg-subtle">Illustration of your live statistics</p>
+    </div>
+  );
+}
+
+function IconTile({ icon: Icon }) {
+  return (
+    <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-accent">
+      <Icon className="h-5 w-5" aria-hidden="true" />
+    </span>
+  );
+}
+
+function FeatureCard({ icon, title, children, preview }) {
+  return (
+    <Card className="h-full transition duration-300 hover:-translate-y-1 hover:border-white/20">
+      <IconTile icon={icon} />
+      <h3 className="mt-4 text-lg font-bold text-white">{title}</h3>
+      <p className="mt-1.5 text-sm leading-relaxed text-fg-muted">{children}</p>
+      {preview}
+    </Card>
   );
 }
 
@@ -64,33 +139,33 @@ export default function Landing() {
   const { openSignIn } = useSignIn();
   const { posters, groups } = useTrendingArtwork();
   const one = (type) => (groups[type] ?? []).find((m) => m.posterUrl);
-  const trio = ['ANIME', 'TV', 'MOVIE'].map(one).filter(Boolean);
+  const trio = ['ANIME', 'MOVIE', 'TV'].map(one).filter(Boolean);
 
   return (
     <>
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_75%_30%,rgba(224,122,95,0.10),transparent)]" aria-hidden="true" />
-        <Container className="grid items-center gap-12 py-14 sm:py-20 lg:grid-cols-[1.05fr_1fr] lg:py-24">
+        <div className="bg-dots mask-radial pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div className="bg-grid mask-radial pointer-events-none absolute inset-0 opacity-70" aria-hidden="true" />
+        <Container className="relative grid items-center gap-12 py-14 sm:py-20 lg:grid-cols-[1.05fr_1fr] lg:py-24">
           <div>
             <Reveal>
-              <Badge tone="copper" className="mb-5">
-                <Sparkles className="h-3 w-3" aria-hidden="true" /> Anime · Movies · TV in one library
-              </Badge>
+              <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-semibold text-fg-muted">
+                <Sparkles className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+                Anime · Movies · TV in one library
+              </span>
             </Reveal>
             <Reveal delay={0.05}>
-              <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight text-fg sm:text-5xl lg:text-6xl">
+              <h1 className="text-5xl font-black leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
                 Your watchlist.
                 <br />
                 Your stories.
                 <br />
-                <span className="text-copper">Your universe.</span>
+                <span className="text-accent">Your universe.</span>
               </h1>
             </Reveal>
             <Reveal delay={0.12}>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-fg-muted">
-                Track every anime, movie and series you love, all in one personal library.
-              </p>
+              <p className="mt-6 max-w-xl text-lg leading-relaxed text-fg-muted">Track every anime, movie and series you love, all in one personal library.</p>
             </Reveal>
             <Reveal delay={0.18}>
               <div className="mt-9 flex flex-wrap gap-3">
@@ -110,104 +185,52 @@ export default function Landing() {
         </Container>
       </section>
 
-      {/* 1. Unified library */}
-      <section className="border-t border-ink-line py-20">
-        <Container className="grid items-center gap-12 lg:grid-cols-2">
-          <Reveal inView>
-            <FeatureHeading eyebrow="Unified entertainment library" title="Anime, shows and films, side by side.">
-              Stop juggling three apps. Anime from AniList and movies and series from TMDB live in one library, with one
-              status system, one rating scale and one place to pick up where you left off.
-            </FeatureHeading>
-          </Reveal>
-          <Reveal inView delay={0.1}>
-            {trio.length === 3 ? (
-              <div className="grid grid-cols-3 gap-4">
-                {trio.map((m, i) => (
-                  <div key={m.mediaType} className={i === 1 ? 'mt-6' : ''}>
-                    <PosterImage src={m.posterUrl} alt="" className="aspect-[2/3] rounded-xl border border-ink-edge shadow-lift" />
-                    <p className="mt-2.5 text-center text-xs font-medium text-fg-muted">{TYPE_LABELS[m.mediaType]}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="grid grid-cols-3 gap-4 text-center text-sm text-fg-muted">
-                {['Anime', 'TV Shows', 'Movies'].map((t) => (
-                  <div key={t} className="flex aspect-[2/3] items-center justify-center rounded-xl border border-ink-edge bg-ink-surface">
-                    {t}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Reveal>
-        </Container>
-      </section>
-
-      {/* 2. Episode precision */}
-      <section className="border-t border-ink-line bg-ink-surface/40 py-20">
-        <Container className="grid items-center gap-12 lg:grid-cols-2">
-          <Reveal inView delay={0.1} className="order-2 lg:order-1">
-            <div className="rounded-2xl border border-ink-edge bg-ink-surface p-5 shadow-card" aria-label="Illustration of the episode tracker">
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-sm font-semibold text-fg">Episode tracker</p>
-                <Badge tone="neutral">Illustration</Badge>
-              </div>
-              <ProgressBar value={3} max={5} label="Example progress" />
-              <div className="mt-4 flex gap-1.5">
-                {['Season 1', 'Season 2'].map((s, i) => (
-                  <span
-                    key={s}
-                    className={`rounded-lg border px-3 py-1 text-xs font-medium ${i === 0 ? 'border-copper/50 bg-copper/10 text-copper' : 'border-ink-edge text-fg-muted'}`}
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
-              <ul className="mt-4 space-y-1.5">
-                {[true, true, true, false, false].map((done, i) => (
-                  <li
-                    key={i}
-                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${done ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-ink-edge bg-ink-raised/50'}`}
-                  >
-                    <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${done ? 'border-emerald-500 bg-emerald-500 text-ink-base' : 'border-[#3b455e]'}`}>
-                      {done && <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />}
-                    </span>
-                    <span className="text-sm text-fg-muted">Episode {i + 1}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Reveal>
-          <Reveal inView className="order-1 lg:order-2">
-            <FeatureHeading eyebrow="Episode-by-episode precision" title="Know exactly where you stopped.">
-              Tick off episodes one at a time or a whole season at once. Progress bars, automatic status changes and
-              season tabs keep every series up to date without any busywork.
-            </FeatureHeading>
-          </Reveal>
-        </Container>
-      </section>
-
-      {/* 3. Stats & privacy */}
-      <section className="border-t border-ink-line py-20">
+      {/* Feature cards with live micro-previews */}
+      <section className="relative overflow-hidden border-t border-white/[0.06] py-20">
         <Container>
           <Reveal inView>
-            <FeatureHeading eyebrow="Personal stats & privacy" title="Your numbers. Your rules.">
-              See what you have watched, how much, and how you rate it. Then decide who else gets to see any of it.
-            </FeatureHeading>
+            <p className="text-sm font-bold text-accent">Everything in one place</p>
+            <h2 className="mt-2 max-w-2xl text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Built for people who actually finish their watchlist.</h2>
+          </Reveal>
+          <div className="mt-10 grid gap-5 lg:grid-cols-3">
+            <Reveal inView delay={0.02}>
+              <FeatureCard icon={Tv} title="Episode-by-episode precision" preview={<TickDemo />}>
+                Tick episodes off one at a time or a whole season at once. Progress and status update by themselves.
+              </FeatureCard>
+            </Reveal>
+            <Reveal inView delay={0.09}>
+              <FeatureCard icon={Library} title="One unified library" preview={<CatalogPreview trio={trio} />}>
+                Anime from AniList, movies and series from TMDB: one status system, one rating scale, one place.
+              </FeatureCard>
+            </Reveal>
+            <Reveal inView delay={0.16}>
+              <FeatureCard icon={BarChart3} title="Live personal stats" preview={<StatsPreview />}>
+                Titles, episodes watched, completions and your average rating, always calculated from your real library.
+              </FeatureCard>
+            </Reveal>
+          </div>
+        </Container>
+      </section>
+
+      {/* Privacy */}
+      <section className="relative overflow-hidden border-t border-white/[0.06] py-20">
+        <Container>
+          <Reveal inView>
+            <p className="text-sm font-bold text-accent">Privacy, on your terms</p>
+            <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-white sm:text-4xl">Your numbers. Your rules.</h2>
           </Reveal>
           <div className="mt-10 grid gap-5 md:grid-cols-3">
             {[
-              { icon: BarChart3, title: 'Live statistics', text: 'Titles, episodes watched, completions and your average rating, always calculated from your real library.' },
-              { icon: Eye, title: 'Public or private profile', text: 'Share a profile page, or keep it entirely to yourself. It is one switch in settings.' },
-              { icon: Lock, title: 'Library privacy, separately', text: 'Show your profile but hide your library. Personal notes are never public, whatever you choose.' }
+              { icon: Eye, title: 'Public or private profile', text: 'Share a profile page, or keep it entirely to yourself with one switch.' },
+              { icon: Lock, title: 'Library privacy, separately', text: 'Show your profile but hide your library, progress and statistics.' },
+              { icon: Sparkles, title: 'Notes are always private', text: 'Personal notes never appear on any public page, whatever you choose.' }
             ].map((f, i) => (
               <Reveal inView delay={0.07 * i} key={f.title}>
-                <div className="h-full rounded-2xl border border-ink-edge bg-ink-surface p-6 shadow-card">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-ink-edge bg-ink-raised">
-                    <f.icon className="h-5 w-5 text-copper" aria-hidden="true" />
-                  </span>
-                  <h3 className="mt-4 text-base font-semibold text-fg">{f.title}</h3>
+                <Card className="h-full transition duration-300 hover:-translate-y-1 hover:border-white/20">
+                  <IconTile icon={f.icon} />
+                  <h3 className="mt-4 text-base font-bold text-white">{f.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-fg-muted">{f.text}</p>
-                </div>
+                </Card>
               </Reveal>
             ))}
           </div>
@@ -215,12 +238,12 @@ export default function Landing() {
       </section>
 
       {/* Closing CTA */}
-      <section className="border-t border-ink-line pb-4 pt-20">
+      <section className="relative overflow-hidden border-t border-white/[0.06] pb-4 pt-20">
         <Container>
           <Reveal inView>
-            <div className="relative overflow-hidden rounded-3xl border border-ink-edge bg-ink-surface px-6 py-14 text-center sm:px-12">
-              <div className="pointer-events-none absolute left-1/2 top-0 h-56 w-[36rem] -translate-x-1/2 rounded-full bg-copper/10 blur-3xl" aria-hidden="true" />
-              <h2 className="relative text-3xl font-bold tracking-tight text-fg sm:text-4xl">Ready to build your library?</h2>
+            <div className="glass relative overflow-hidden rounded-3xl px-6 py-16 text-center sm:px-12">
+              <div className="bg-dots mask-radial pointer-events-none absolute inset-0" aria-hidden="true" />
+              <h2 className="relative text-3xl font-black tracking-tight text-white sm:text-5xl">Ready to build your library?</h2>
               <p className="relative mx-auto mt-3 max-w-lg text-fg-muted">Sign in once and pick up exactly where you left off, on any device.</p>
               <div className="relative mt-8 flex flex-wrap justify-center gap-3">
                 <Button variant="primary" size="lg" rightIcon={ArrowRight} onClick={openSignIn}>

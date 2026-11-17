@@ -29,8 +29,17 @@ function createPoolConfig(connStr) {
   const config = {
     connectionString: cleanConnStr,
     max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000
+    // Opening a connection to the (remote) database costs ~2s, so keep a few warm:
+    // connections up to `min` are never closed for being idle, TCP keep-alive stops
+    // NATs/poolers silently dropping them, and warmPool() opens them at startup.
+    min: 3,
+    // Warm idle connections must not keep a short-lived script (tests, migrations) from exiting;
+    // the HTTP server keeps the real backend process alive on its own.
+    allowExitOnIdle: true,
+    idleTimeoutMillis: 10 * 60 * 1000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
+    connectionTimeoutMillis: 10000
   };
 
   if (!isLocalhost) {
@@ -105,9 +114,46 @@ export const checkDatabaseConnection = async () => {
 };
 
 /**
+ * Opens `count` connections at once and returns them to the pool, so the first
+ * real requests do not each pay the cold-connection cost.
+ */
+export const warmPool = async (count = 3) => {
+  if (!appConnectionString) return 0;
+  const clients = await Promise.allSettled(Array.from({ length: count }, () => pool.connect()));
+  let opened = 0;
+  for (const outcome of clients) {
+    if (outcome.status === 'fulfilled') {
+      opened += 1;
+      outcome.value.release();
+    }
+  }
+  return opened;
+};
+
+let keepAliveTimer = null;
+/** Pings the warm connections every few minutes so they stay open between bursts of use. */
+export const startPoolKeepAlive = (everyMs = 4 * 60 * 1000, count = 3) => {
+  if (keepAliveTimer || !appConnectionString) return;
+  keepAliveTimer = setInterval(() => {
+    Promise.allSettled(
+      Array.from({ length: count }, async () => {
+        const client = await pool.connect();
+        try {
+          await client.query('SELECT 1');
+        } finally {
+          client.release();
+        }
+      })
+    ).catch(() => {});
+  }, everyMs);
+  keepAliveTimer.unref();
+};
+
+/**
  * Gracefully close pools upon server termination.
  */
 export const closePool = async () => {
+  if (keepAliveTimer) clearInterval(keepAliveTimer);
   await pool.end();
   if (migrationPool !== pool) {
     await migrationPool.end();
@@ -120,5 +166,7 @@ export default {
   migrationPool,
   query,
   checkDatabaseConnection,
+  warmPool,
+  startPoolKeepAlive,
   closePool
 };

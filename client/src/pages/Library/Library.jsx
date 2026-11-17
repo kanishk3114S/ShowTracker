@@ -1,9 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Compass, Library as LibraryIcon } from 'lucide-react';
+import { Compass, LayoutGrid, Library as LibraryIcon, List } from 'lucide-react';
 import Container from '../../components/layout/Container';
 import PageHeader from '../../components/layout/PageHeader';
-import LibraryCard from '../../components/library/LibraryCard';
+import LibraryCard, { LibraryRow } from '../../components/library/LibraryCard';
 import LibraryFilters, { SORTS } from '../../components/library/LibraryFilters';
 import ProviderErrorState from '../../components/media/ProviderErrorState';
 import EmptyState from '../../components/media/EmptyState';
@@ -11,8 +11,17 @@ import Button from '../../components/ui/Button';
 import { PosterGridSkeleton, POSTER_GRID } from '../../components/ui/Skeleton';
 import { Stagger, StaggerItem } from '../../components/ui/motion';
 import { STATUS_ORDER } from '../../components/library/libraryConstants';
-import { getMyLibrary, getLibraryStats } from '../../services/api';
-import { useApiResource } from '../../hooks/useApiResource';
+import { R } from '../../services/resources';
+import { useResource } from '../../hooks/useApiResource';
+
+const VIEW_KEY = 'showtracker.libraryView';
+const readView = () => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
+  } catch {
+    return 'grid';
+  }
+};
 
 const EMPTY_COPY = {
   '': 'Your library is empty. Find something to watch and add it.',
@@ -41,12 +50,19 @@ export default function Library() {
       { replace: true }
     );
 
-  const { data, error, loading, reload } = useApiResource(
-    (signal) => getMyLibrary({ status, mediaType, sort, order }, signal),
-    [status, mediaType, sort, order]
-  );
-  const stats = useApiResource((signal) => getLibraryStats(signal), []);
+  const { data, error, loading, reload } = useResource(R.library({ status, mediaType, sort, order }));
+  const stats = useResource(R.stats());
   const counts = useMemo(() => (stats.data ? { total: stats.data.totalItems, byStatus: stats.data.byStatus } : null), [stats.data]);
+
+  const [view, setView] = useState(readView);
+  const chooseView = (next) => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      /* preference just won't persist */
+    }
+  };
 
   const entries = data ?? [];
   const filtered = Boolean(status || mediaType);
@@ -63,6 +79,28 @@ export default function Library() {
         breadcrumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'My Library' }]}
         description="Everything you watch, in one place."
       />
+
+      <div className="mb-4 flex justify-end">
+        <div role="group" aria-label="Library view" className="glass-lite inline-flex rounded-xl p-1">
+          {[
+            ['grid', LayoutGrid, 'Grid view'],
+            ['list', List, 'List view']
+          ].map(([value, Icon, label]) => (
+            <button
+              key={value}
+              type="button"
+              aria-pressed={view === value}
+              aria-label={label}
+              onClick={() => chooseView(value)}
+              className={`flex h-8 w-9 items-center justify-center rounded-lg transition ${
+                view === value ? 'bg-white/[0.1] text-fg ring-1 ring-white/15' : 'text-fg-muted hover:text-fg'
+              }`}
+            >
+              <Icon className="h-4 w-4" aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+      </div>
 
       <LibraryFilters
         status={status}
@@ -90,13 +128,13 @@ export default function Library() {
           />
         ) : (
           <Stagger
-            key={`${status}|${mediaType}|${sortKey}`}
-            className={`${POSTER_GRID} transition-opacity ${loading ? 'opacity-50' : 'opacity-100'}`}
+            key={`${status}|${mediaType}|${sortKey}|${view}`}
+            className={`${view === 'grid' ? POSTER_GRID : 'space-y-3'} transition-opacity ${loading ? 'opacity-50' : 'opacity-100'}`}
             gap={0.03}
           >
             {entries.map((entry) => (
               <StaggerItem key={entry.id}>
-                <LibraryCard entry={entry} onChanged={onChanged} />
+                {view === 'grid' ? <LibraryCard entry={entry} onChanged={onChanged} /> : <LibraryRow entry={entry} onChanged={onChanged} />}
               </StaggerItem>
             ))}
           </Stagger>

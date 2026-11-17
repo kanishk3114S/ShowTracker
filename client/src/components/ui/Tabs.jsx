@@ -23,7 +23,7 @@ export default function Tabs({ tabs, value, onChange, ariaLabel, name, className
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={`no-scrollbar flex max-w-full gap-1 overflow-x-auto rounded-xl border border-ink-edge bg-ink-surface p-1 ${className}`}
+      className={`no-scrollbar glass-lite flex max-w-full gap-1 overflow-x-auto rounded-xl p-1 ${className}`}
     >
       {tabs.map((tab, i) => {
         const active = tab.value === value;
@@ -44,14 +44,20 @@ export default function Tabs({ tabs, value, onChange, ariaLabel, name, className
             {active && (
               <motion.span
                 layoutId={layoutId}
-                className="absolute inset-0 rounded-lg bg-ink-raised ring-1 ring-ink-edge"
+                className="absolute inset-0 rounded-lg bg-white/[0.1] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.08)] ring-1 ring-white/15"
                 transition={{ type: 'spring', stiffness: 500, damping: 38 }}
               />
             )}
             <span className="relative z-10 flex items-center gap-1.5">
               {tab.label}
               {tab.count !== undefined && (
-                <span className={`text-xs tabular-nums ${active ? 'text-copper' : 'text-fg-subtle'}`}>{tab.count}</span>
+                <span
+                  className={`min-w-[1.25rem] rounded-full px-1.5 text-center text-[11px] font-semibold tabular-nums ${
+                    active ? 'bg-accent text-ink-base' : 'bg-white/[0.07] text-fg-subtle'
+                  }`}
+                >
+                  {tab.count}
+                </span>
               )}
             </span>
           </button>

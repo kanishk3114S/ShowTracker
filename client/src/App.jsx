@@ -6,20 +6,21 @@ import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { PublicRoute } from './routes/PublicRoute';
 import AppShell from './components/layout/AppShell';
+import { pageLoaders } from './routes/pages';
 
 import Landing from './pages/Landing/Landing';
-const SignIn = lazy(() => import('./pages/Auth/SignIn'));
-const AuthCallback = lazy(() => import('./pages/AuthCallback/AuthCallback'));
-const Onboarding = lazy(() => import('./pages/Onboarding/Onboarding'));
-const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
-const Explore = lazy(() => import('./pages/Explore/Explore'));
-const Trending = lazy(() => import('./pages/Trending/Trending'));
-const MediaDetails = lazy(() => import('./pages/MediaDetails/MediaDetails'));
-const Library = lazy(() => import('./pages/Library/Library'));
-const PublicProfile = lazy(() => import('./pages/PublicProfile/PublicProfile'));
-const Settings = lazy(() => import('./pages/Settings/Settings'));
-const Credits = lazy(() => import('./pages/Credits/Credits'));
-const Health = lazy(() => import('./pages/Health/Health'));
+const SignIn = lazy(pageLoaders.SignIn);
+const AuthCallback = lazy(pageLoaders.AuthCallback);
+const Onboarding = lazy(pageLoaders.Onboarding);
+const Dashboard = lazy(pageLoaders.Dashboard);
+const Explore = lazy(pageLoaders.Explore);
+const Trending = lazy(pageLoaders.Trending);
+const MediaDetails = lazy(pageLoaders.MediaDetails);
+const Library = lazy(pageLoaders.Library);
+const PublicProfile = lazy(pageLoaders.PublicProfile);
+const Settings = lazy(pageLoaders.Settings);
+const Credits = lazy(pageLoaders.Credits);
+const Health = lazy(pageLoaders.Health);
 
 export default function App() {
   return (

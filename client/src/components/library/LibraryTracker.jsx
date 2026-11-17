@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Heart, LogIn, NotebookPen, Plus, Star, Trash2 } from 'lucide-react';
+import { STATUS_THEME } from '../ui/theme';
 import EpisodeTracker from './EpisodeTracker';
 import { STATUS_META, STATUS_ORDER, RATING_OPTIONS, NOTES_MAX, fieldClass } from './libraryConstants';
 import Button from '../ui/Button';
@@ -7,8 +8,9 @@ import Card from '../ui/Card';
 import Modal from '../ui/Modal';
 import { StatusBadge } from '../ui/Badge';
 import { Skeleton } from '../ui/Skeleton';
-import { checkLibraryEntry, addToLibrary, updateLibraryEntry, removeFromLibrary, toApiError } from '../../services/api';
-import { useApiResource } from '../../hooks/useApiResource';
+import { addToLibrary, updateLibraryEntry, removeFromLibrary, toApiError } from '../../services/api';
+import { R } from '../../services/resources';
+import { useResource } from '../../hooks/useApiResource';
 import { useAuth } from '../../hooks/useAuth';
 import { useSignIn } from '../auth/SignInContext';
 
@@ -33,11 +35,11 @@ function NotesDialog({ open, initial, busy, onClose, onSave }) {
         maxLength={NOTES_MAX}
         rows={8}
         placeholder="Thoughts, where you stopped, who recommended it…"
-        className="w-full resize-y rounded-xl border border-ink-edge bg-ink-raised p-3 text-sm leading-relaxed text-fg outline-none focus:border-copper/70 focus:ring-2 focus:ring-copper/20"
+        className="w-full resize-y rounded-xl border border-ink-edge bg-ink-raised p-3 text-sm leading-relaxed text-fg outline-none focus:border-accent/60 focus:ring-2 focus:ring-accent/20"
       />
       <div className="mt-2 flex items-center justify-between text-xs text-fg-subtle">
-        <span className="tabular-nums">
-          {draft.length} / {NOTES_MAX}
+        <span className="font-mono tabular-nums tracking-tight text-fg-muted">
+          {String(draft.length).padStart(4, '0')} / {NOTES_MAX}
         </span>
         <div className="flex gap-2">
           <Button size="sm" variant="ghost" onClick={onClose}>
@@ -64,9 +66,7 @@ export default function LibraryTracker({ media }) {
   const mediaId = media.catalogId;
   const isMovie = media.mediaType === 'MOVIE';
 
-  const check = useApiResource((signal) => checkLibraryEntry(mediaId, signal), [mediaId], {
-    enabled: Boolean(isAuthenticated && mediaId)
-  });
+  const check = useResource(R.checkEntry(mediaId), { enabled: Boolean(isAuthenticated && mediaId) });
   const [entry, setEntry] = useState(null);
   const [watchedIds, setWatchedIds] = useState(() => new Set());
   const [busy, setBusy] = useState(false);
@@ -211,7 +211,7 @@ export default function LibraryTracker({ media }) {
   return (
     <>
       <Card className={panel}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-semibold text-fg">Your library</h2>
           <StatusBadge status={entry.status} />
         </div>
@@ -236,13 +236,16 @@ export default function LibraryTracker({ media }) {
               <label htmlFor="library-status" className="mb-1.5 block text-xs font-medium text-fg-subtle">
                 Status
               </label>
-              <select id="library-status" value={entry.status} disabled={busy} onChange={(e) => patch({ status: e.target.value })} className={fieldClass}>
-                {STATUS_ORDER.map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_META[s].label}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <span className={`pointer-events-none absolute left-3.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full ${STATUS_THEME[entry.status].dot}`} aria-hidden="true" />
+                <select id="library-status" value={entry.status} disabled={busy} onChange={(e) => patch({ status: e.target.value })} className={`${fieldClass} pl-9`}>
+                  {STATUS_ORDER.map((s) => (
+                    <option key={s} value={s}>
+                      {STATUS_META[s].label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
 
@@ -251,7 +254,7 @@ export default function LibraryTracker({ media }) {
               Your rating
             </label>
             <div className="relative">
-              <Star className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber" aria-hidden="true" />
+              <Star className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 fill-accent text-accent" aria-hidden="true" />
               <select
                 id="library-rating"
                 value={entry.rating ?? ''}
@@ -271,15 +274,24 @@ export default function LibraryTracker({ media }) {
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-ink-line pt-5">
-          <Button
-            variant={entry.isFavorite ? 'destructive' : 'secondary'}
-            leftIcon={Heart}
+          <button
+            type="button"
             disabled={busy}
             aria-pressed={entry.isFavorite}
             onClick={() => patch({ isFavorite: !entry.isFavorite })}
+            className={`inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-medium transition active:scale-95 disabled:opacity-50 ${
+              entry.isFavorite
+                ? 'border-red-400/40 bg-red-500/10 text-red-200'
+                : 'border-white/10 bg-white/[0.06] text-fg hover:bg-white/[0.11]'
+            }`}
           >
+            <Heart
+              key={String(entry.isFavorite)}
+              className={`h-4 w-4 ${entry.isFavorite ? 'animate-check-pop fill-red-500 text-red-500' : ''}`}
+              aria-hidden="true"
+            />
             {entry.isFavorite ? 'Favorite' : 'Add to favorites'}
-          </Button>
+          </button>
           <Button variant="secondary" leftIcon={NotebookPen} disabled={busy} onClick={() => setNotesOpen(true)}>
             {entry.notes ? 'Edit notes' : 'Add notes'}
           </Button>

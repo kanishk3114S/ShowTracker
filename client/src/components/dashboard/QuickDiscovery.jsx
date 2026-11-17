@@ -29,7 +29,7 @@ export default function QuickDiscovery() {
           <h2 className="text-xl font-semibold tracking-tight text-fg">Trending this week</h2>
           <p className="mt-1 text-sm text-fg-muted">Fresh picks from TMDB and AniList.</p>
         </div>
-        <Link to="/trending" className="inline-flex items-center gap-1 text-sm font-medium text-copper transition hover:text-copper-hover">
+        <Link to="/trending" className="inline-flex items-center gap-1 text-sm font-medium text-accent transition hover:text-accent-hover">
           See all <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       </div>

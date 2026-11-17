@@ -12,8 +12,11 @@ export default function MediaGroupSection({ group, showHeading = true, limit, su
   return (
     <section aria-label={TYPE_PLURAL[group.mediaType]}>
       {showHeading && (
-        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-ink-line pb-3">
-          <h2 className="text-xl font-semibold tracking-tight text-fg">{TYPE_PLURAL[group.mediaType]}</h2>
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-3 border-b border-white/[0.08] pb-3">
+          <h2 className="relative flex items-center gap-2.5 text-2xl font-extrabold tracking-tight text-white">
+            <span className="h-5 w-1 rounded-full bg-accent" aria-hidden="true" />
+            {TYPE_PLURAL[group.mediaType]}
+          </h2>
           {(subtitle || group.label) && <p className="text-xs text-fg-subtle">{subtitle || group.label}</p>}
         </div>
       )}

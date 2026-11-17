@@ -24,6 +24,10 @@ const TTL = {
 // Exported so tests can clear it.
 export const cache = new TTLCache({ maxEntries: 500 });
 
+// provider-key -> catalog id of titles already saved to the database (bounded, process-local)
+const persistedIds = new Map();
+const PERSIST_TTL_MS = 6 * 60 * 60 * 1000;
+
 const PROVIDER_FOR_TYPE = { ANIME: 'ANILIST', MOVIE: 'TMDB', TV: 'TMDB' };
 const TMDB_PATH = { MOVIE: 'movie', TV: 'tv' };
 const ALL_TYPES = ['ANIME', 'MOVIE', 'TV'];
@@ -222,11 +226,20 @@ export async function getMediaDetails({ provider, mediaType, externalId, refresh
 
       // Opening a details page adds the title to the shared catalog (idempotent upsert).
       // A database problem must not break browsing, so it is logged and the page still renders.
+      // A title saved recently is not saved again (the database is remote: ~10 round trips per save).
+      // `refresh` forces a re-save.
       let catalogId = null;
-      try {
-        catalogId = await upsertMediaFromDetails(media);
-      } catch (err) {
-        console.error('[MediaCatalog] Could not persist media to catalog:', err.message);
+      const known = persistedIds.get(key);
+      if (known && !refresh && Date.now() - known.at < PERSIST_TTL_MS) {
+        catalogId = known.id;
+      } else {
+        try {
+          catalogId = await upsertMediaFromDetails(media);
+          if (persistedIds.size >= 2000) persistedIds.delete(persistedIds.keys().next().value);
+          persistedIds.set(key, { id: catalogId, at: Date.now() });
+        } catch (err) {
+          console.error('[MediaCatalog] Could not persist media to catalog:', err.message);
+        }
       }
       return { ...media, catalogId };
     },

@@ -87,7 +87,7 @@ export default function Modal({ open, onClose, title, description, ariaLabel, ba
             aria-labelledby={title ? titleId : undefined}
             aria-describedby={description ? descId : undefined}
             tabIndex={-1}
-            className={`relative max-h-[92vh] w-full overflow-y-auto rounded-t-2xl border border-ink-edge bg-ink-surface shadow-lift outline-none sm:rounded-2xl ${SIZES[size]}`}
+            className={`relative max-h-[92vh] w-full overflow-y-auto glass rounded-t-2xl shadow-lift outline-none sm:rounded-2xl ${SIZES[size]}`}
             initial={{ opacity: 0, y: 24, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 16, scale: 0.98, transition: { duration: 0.15 } }}

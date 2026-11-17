@@ -4,7 +4,8 @@ const SIZES = { sm: 'h-7 w-7 text-xs', md: 'h-9 w-9 text-sm', lg: 'h-16 w-16 tex
 
 /** Profile picture with a graceful initial fallback (also used when the image URL fails to load). */
 export default function Avatar({ src, name = '', size = 'md', className = '' }) {
-  const [failed, setFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState(null);
+  const failed = failedSrc === src; // a new src gets a fresh attempt
   const initial = (name.trim()[0] || '?').toUpperCase();
   return (
     <span
@@ -15,7 +16,7 @@ export default function Avatar({ src, name = '', size = 'md', className = '' }) 
           src={src}
           alt=""
           referrerPolicy="no-referrer"
-          onError={() => setFailed(true)}
+          onError={() => setFailedSrc(src)}
           className="h-full w-full object-cover"
         />
       ) : (

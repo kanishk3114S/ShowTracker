@@ -7,6 +7,7 @@ import UserMenu from './UserMenu';
 import Container from './Container';
 import { useAuth } from '../../hooks/useAuth';
 import { useSignIn } from '../auth/SignInContext';
+import { prefetchNav } from '../../routes/pages';
 
 export function navItems(isAuthenticated) {
   return isAuthenticated
@@ -28,7 +29,7 @@ export default function TopHeader() {
   const { openSignIn } = useSignIn();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-ink-line bg-ink-base/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-white/[0.07] bg-ink-base/70 shadow-[0_1px_0_0_rgba(255,255,255,0.04)_inset] backdrop-blur-xl">
       <Container className="flex h-16 items-center justify-between gap-4">
         <div className="flex items-center gap-8">
           <Logo to={isAuthenticated ? '/dashboard' : '/'} />
@@ -37,6 +38,9 @@ export default function TopHeader() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                onPointerEnter={() => prefetchNav(item.to, isAuthenticated)}
+                onFocus={() => prefetchNav(item.to, isAuthenticated)}
+                onTouchStart={() => prefetchNav(item.to, isAuthenticated)}
                 className={({ isActive }) =>
                   `relative rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive ? 'text-fg' : 'text-fg-muted hover:text-fg'
@@ -49,7 +53,7 @@ export default function TopHeader() {
                     {isActive && (
                       <motion.span
                         layoutId="header-active"
-                        className="absolute inset-x-3 -bottom-[17px] h-0.5 rounded-full bg-copper"
+                        className="absolute inset-x-3 -bottom-[17px] h-0.5 rounded-full bg-accent"
                         transition={{ type: 'spring', stiffness: 500, damping: 40 }}
                       />
                     )}

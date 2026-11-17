@@ -17,7 +17,7 @@ export function TmdbLogo({ className = 'h-3.5' }) {
 
 export default function Footer() {
   return (
-    <footer className="mt-20 border-t border-ink-line bg-ink-base pb-24 md:pb-0">
+    <footer className="mb-20 border-t border-ink-line bg-ink-base md:mb-0 md:mt-10">
       <Container className="grid gap-8 py-10 md:grid-cols-[1.2fr_1fr_1fr]">
         <div>
           <Logo />

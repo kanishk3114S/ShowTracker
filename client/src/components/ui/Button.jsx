@@ -2,16 +2,17 @@ import React from 'react';
 import { Loader2 } from 'lucide-react';
 
 const VARIANTS = {
-  primary: 'bg-copper text-ink-base font-semibold hover:bg-copper-hover shadow-sm shadow-black/30',
-  secondary: 'bg-ink-raised text-fg border border-ink-edge hover:bg-[#1f2838] hover:border-[#3b455e]',
-  ghost: 'text-fg-muted hover:text-fg hover:bg-ink-raised',
-  outline: 'border border-ink-edge text-fg hover:bg-ink-raised hover:border-[#3b455e]',
-  destructive: 'bg-vermilion/10 text-[#ff7b7b] border border-vermilion/40 hover:bg-vermilion/20'
+  // Solid gold with a hover sheen
+  primary: 'sheen bg-accent text-ink-base font-semibold shadow-[0_6px_18px_-8px_rgba(0,0,0,0.9)] hover:bg-accent-hover',
+  secondary: 'bg-white/[0.06] text-fg border border-white/10 hover:bg-white/[0.1] hover:border-white/20',
+  ghost: 'text-fg-muted hover:text-fg hover:bg-white/[0.07]',
+  outline: 'border border-white/15 text-fg hover:bg-white/[0.07] hover:border-white/25',
+  destructive: 'bg-red-500/10 text-red-300 border border-red-400/25 hover:bg-red-500/15'
 };
 
 const SIZES = {
   sm: 'h-8 px-3 text-xs gap-1.5 rounded-lg',
-  md: 'h-10 px-4 text-sm gap-2 rounded-lg',
+  md: 'h-10 px-4 text-sm gap-2 rounded-xl',
   lg: 'h-12 px-6 text-base gap-2.5 rounded-xl'
 };
 
@@ -34,7 +35,7 @@ const Button = React.forwardRef(function Button(
       ref={ref}
       {...(isButton ? { type: rest.type ?? 'button', disabled: blocked } : { 'aria-disabled': blocked || undefined })}
       {...rest}
-      className={`inline-flex select-none items-center justify-center whitespace-nowrap transition duration-150 active:scale-[0.97] ${
+      className={`inline-flex select-none items-center justify-center whitespace-nowrap transition duration-200 active:scale-[0.97] ${
         blocked ? 'pointer-events-none opacity-50' : ''
       } ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
     >

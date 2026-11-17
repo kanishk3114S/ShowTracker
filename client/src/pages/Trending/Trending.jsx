@@ -9,8 +9,8 @@ import ProviderErrorState from '../../components/media/ProviderErrorState';
 import Pagination from '../../components/media/Pagination';
 import Tabs from '../../components/ui/Tabs';
 import { PosterGridSkeleton, Skeleton } from '../../components/ui/Skeleton';
-import { getTrendingMedia } from '../../services/api';
-import { useApiResource } from '../../hooks/useApiResource';
+import { R } from '../../services/resources';
+import { useResource } from '../../hooks/useApiResource';
 
 const TYPE_TABS = [
   { value: 'ALL', label: 'All' },
@@ -40,10 +40,7 @@ export default function Trending() {
       { replace: true }
     );
 
-  const { data, error, loading, reload } = useApiResource(
-    (signal) => getTrendingMedia({ type, window: windowValue, page }, signal),
-    [type, windowValue, page]
-  );
+  const { data, error, loading, reload } = useResource(R.trending({ type, window: windowValue, page }));
   const groups = data?.groups ?? [];
   const single = type !== 'ALL';
 

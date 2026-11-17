@@ -9,7 +9,7 @@ dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import app from './app.js';
-import { checkDatabaseConnection, closePool } from './config/database.js';
+import { checkDatabaseConnection, closePool, warmPool, startPoolKeepAlive } from './config/database.js';
 
 const PORT = parseInt(process.env.PORT || '5000', 10);
 
@@ -39,6 +39,14 @@ const server = app.listen(PORT, async () => {
     console.warn(`   - The API is still online for health monitoring and diagnostics.`);
   }
   console.log('====================================================');
+
+  // Pre-open a few connections (first one is already open from the check above) and keep them alive.
+  if (dbStatus.ok) {
+    warmPool(3)
+      .then((n) => console.log(`[Database] ${n} warm connections ready.`))
+      .catch(() => {});
+    startPoolKeepAlive();
+  }
 });
 
 // Startup errors (most commonly: port already in use) must be readable, not a raw stack trace.

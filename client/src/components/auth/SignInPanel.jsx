@@ -87,7 +87,7 @@ export default function SignInPanel() {
         )}
 
         <p className="mt-6 flex items-start gap-2 text-xs leading-relaxed text-fg-subtle">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-copper" aria-hidden="true" />
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
           We only use your Google account to sign you in. Your library notes are always private, and you decide what your
           public profile shows.
         </p>

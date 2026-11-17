@@ -19,7 +19,7 @@ export default function GenreFilter({ genres, value = [], onChange, hint }) {
             <button
               type="button"
               onClick={() => onChange([])}
-              className="shrink-0 rounded-full border border-copper/40 bg-copper/10 px-3 py-1 text-xs font-medium text-copper transition hover:bg-copper/20"
+              className="shrink-0 rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs font-medium text-accent transition hover:bg-accent/15"
             >
               Clear ({value.length})
             </button>
@@ -34,8 +34,8 @@ export default function GenreFilter({ genres, value = [], onChange, hint }) {
                 onClick={() => toggle(genre)}
                 className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition ${
                   active
-                    ? 'border-copper bg-copper text-ink-base'
-                    : 'border-ink-edge bg-ink-surface text-fg-muted hover:border-[#3b455e] hover:text-fg'
+                    ? 'border-accent bg-accent text-ink-base'
+                    : 'glass-lite text-fg-muted hover:border-white/20 hover:text-fg'
                 }`}
               >
                 {genre}

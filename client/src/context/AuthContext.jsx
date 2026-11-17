@@ -1,6 +1,38 @@
-import React, { createContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getMe } from '../services/api';
+import { clearCache } from '../lib/queryCache';
+
+// Last known profile, so a returning user sees the app instantly while it is re-checked in the background.
+// It holds only what the page header already shows (name, avatar, username, privacy flags); never tokens.
+const PROFILE_CACHE_KEY = 'showtracker.profile.v1';
+
+function readCachedProfile(userId) {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || 'null');
+    return raw && raw.userId === userId && raw.profile ? raw.profile : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedProfile(userId, profile) {
+  try {
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify({ userId, profile }));
+  } catch {
+    /* storage unavailable: just skip the shortcut */
+  }
+}
+
+/** Forget everything private held in this tab (profile shortcut and all cached API data). */
+function forgetPrivateData() {
+  clearCache();
+  try {
+    localStorage.removeItem(PROFILE_CACHE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export const AuthContext = createContext({
   user: null,
@@ -21,6 +53,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const lastUserId = useRef(null); // to notice an account switch
 
   // Fetch ShowTracker profile from Express
   const fetchProfile = useCallback(async () => {
@@ -28,6 +61,7 @@ export function AuthProvider({ children }) {
       const data = await getMe();
       if (data?.success && data?.profile) {
         setProfile(data.profile);
+        writeCachedProfile(data.profile.id, data.profile);
       }
       return data;
     } catch (err) {
@@ -53,7 +87,15 @@ export function AuthProvider({ children }) {
           if (initialSession?.user) {
             setSession(initialSession);
             setUser(initialSession.user);
-            await fetchProfile();
+            lastUserId.current = initialSession.user.id;
+            const cached = readCachedProfile(initialSession.user.id);
+            if (cached) {
+              // Show the app right away; confirm the profile in the background.
+              setProfile(cached);
+              fetchProfile();
+            } else {
+              await fetchProfile();
+            }
           } else {
             setSession(null);
             setUser(null);
@@ -79,11 +121,14 @@ export function AuthProvider({ children }) {
       if (!mounted) return;
 
       if (event === 'SIGNED_OUT') {
+        forgetPrivateData();
         setSession(null);
         setUser(null);
         setProfile(null);
         setLoading(false);
       } else if (currentSession?.user) {
+        if (lastUserId.current && lastUserId.current !== currentSession.user.id) forgetPrivateData();
+        lastUserId.current = currentSession.user.id;
         setSession(currentSession);
         setUser(currentSession.user);
         // Defer API call outside the sync auth event to prevent deadlock
@@ -121,6 +166,7 @@ export function AuthProvider({ children }) {
     try {
       await supabase.auth.signOut();
     } finally {
+      forgetPrivateData();
       setSession(null);
       setUser(null);
       setProfile(null);

@@ -1315,3 +1315,12 @@ ShowTracker's first successful release is not measured by the number of pages or
 **Decisions:** a private profile and an unknown username return the same 404 (no enumeration); the avatar must be an http(s) URL; specials still do not count toward progress; stats count every watched episode.
 
 **Still out of scope:** followers, social feeds, recommendations, Redis, native mobile apps.
+
+
+---
+
+## Visual Elevation and Speed Pass (Implemented)
+
+**Visual identity:** a restrained palette: neutral near-black surfaces, white type and a single warm-gold accent (primary action, active states, ratings, progress). Status is a small colored dot on a neutral pill; media types are labelled, not color-coded. Texture comes from fine film grain, faint dot/grid patterns and neutral frosted glass. Redesigned landing, dashboard, cards, details tracker, library (grid and list views, one-tap status cycle, "next episode" quick tick on the Continue Watching shelf), settings and profile (including a calm "private" state). Animation is kept: staggered reveals, sliding tab indicators, count-up stats, progress fills, hover lift and check-pop.
+
+**Speed:** stale-while-revalidate data cache, route and data prefetch on hover/idle, cached profile for instant start, fewer database round trips per request, warm connection pool, and code-split routes. No database, migration, view or endpoint contract changed.

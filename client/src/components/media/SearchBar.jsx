@@ -13,7 +13,7 @@ export default function SearchBar({ value, onChange, placeholder = 'Search title
         aria-label="Search titles"
         maxLength={100}
         autoFocus={autoFocus}
-        className="h-12 w-full rounded-xl border border-ink-edge bg-ink-surface pl-11 pr-11 text-[15px] text-fg placeholder-fg-subtle outline-none transition focus:border-copper/70 focus:ring-2 focus:ring-copper/20 [&::-webkit-search-cancel-button]:hidden"
+        className="h-12 w-full glass rounded-2xl pl-11 pr-11 text-[15px] text-fg placeholder-fg-subtle outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20 [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
         <button

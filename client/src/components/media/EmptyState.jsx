@@ -3,8 +3,8 @@ import { SearchX } from 'lucide-react';
 
 export default function EmptyState({ title = 'Nothing found', message, icon: Icon = SearchX, action }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-edge bg-ink-surface/40 px-6 py-16 text-center">
-      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-ink-edge bg-ink-raised">
+    <div className="flex flex-col items-center justify-center glass-lite rounded-3xl border-dashed px-6 py-16 text-center">
+      <span className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/[0.06]">
         <Icon className="h-5 w-5 text-fg-muted" aria-hidden="true" />
       </span>
       <h3 className="text-base font-semibold text-fg">{title}</h3>

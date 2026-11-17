@@ -8,13 +8,13 @@ import PosterImage from '../../components/media/PosterImage';
 import ProviderErrorState from '../../components/media/ProviderErrorState';
 import EmptyState from '../../components/media/EmptyState';
 import LibraryTracker from '../../components/library/LibraryTracker';
-import Badge from '../../components/ui/Badge';
+import { CategoryBadge } from '../../components/ui/Badge';
 import Button from '../../components/ui/Button';
 import { Skeleton } from '../../components/ui/Skeleton';
 import { Reveal } from '../../components/ui/motion';
-import { getMediaDetails } from '../../services/api';
-import { useApiResource } from '../../hooks/useApiResource';
-import { TYPE_LABELS, PROVIDER_NAMES, formatDate, formatRuntime, humanize, mediaPath } from '../../components/media/mediaUtils';
+import { R } from '../../services/resources';
+import { useResource } from '../../hooks/useApiResource';
+import { PROVIDER_NAMES, formatDate, formatRuntime, humanize, mediaPath } from '../../components/media/mediaUtils';
 
 function Fact({ label, value }) {
   if (value === null || value === undefined || value === '') return null;
@@ -47,10 +47,7 @@ export default function MediaDetails() {
   const { provider, mediaType, externalId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { data: media, error, loading, reload } = useApiResource(
-    (signal) => getMediaDetails({ provider, mediaType, externalId }, signal),
-    [provider, mediaType, externalId]
-  );
+  const { data: media, error, loading, reload } = useResource(R.details({ provider, mediaType, externalId }));
 
   if (loading && !media) return <DetailsSkeleton />;
 
@@ -76,7 +73,7 @@ export default function MediaDetails() {
   if (!media) return null;
 
   return (
-    <article>
+    <article className="relative">
       <HeroBackdrop media={media} />
 
       <Container className="-mt-44 sm:-mt-52">
@@ -98,10 +95,10 @@ export default function MediaDetails() {
 
           <Reveal delay={0.08} className="min-w-0 flex-1 sm:pt-20">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="neutral">{TYPE_LABELS[media.mediaType]}</Badge>
+              <CategoryBadge type={media.mediaType} />
               {media.sourceRating != null && (
-                <span className="inline-flex items-center gap-1.5 rounded-md border border-amber/30 bg-amber/10 px-2 py-0.5 text-xs font-semibold text-amber">
-                  <Star className="h-3 w-3 fill-amber" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-0.5 text-xs font-bold text-fg">
+                  <Star className="h-3 w-3 fill-accent text-accent" aria-hidden="true" />
                   {media.sourceRating.toFixed(1)} / 10
                   <span className="font-normal opacity-70">{media.sourceRatingName}</span>
                 </span>

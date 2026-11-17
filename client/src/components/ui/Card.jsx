@@ -1,12 +1,15 @@
 import React from 'react';
 
-/** Standard surface: consistent radius, hairline border and background. */
-export default function Card({ as: Tag = 'div', padded = true, interactive = false, className = '', children, ...rest }) {
+/**
+ * Neutral frosted surface with a 1px top highlight.
+ * `blur={false}` drops the backdrop blur for cards that appear many times on one screen.
+ */
+export default function Card({ as: Tag = 'div', padded = true, interactive = false, blur = true, className = '', children, ...rest }) {
   return (
     <Tag
       {...rest}
-      className={`rounded-xl border border-ink-edge bg-ink-surface shadow-card ${padded ? 'p-5' : ''} ${
-        interactive ? 'transition duration-200 hover:-translate-y-0.5 hover:border-[#3b455e] hover:shadow-lift' : ''
+      className={`relative overflow-hidden rounded-2xl ${blur ? 'glass' : 'glass-lite'} ${padded ? 'p-5' : ''} ${
+        interactive ? 'transition duration-300 hover:-translate-y-1 hover:border-white/20' : ''
       } ${className}`}
     >
       {children}

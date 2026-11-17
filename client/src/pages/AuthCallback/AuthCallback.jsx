@@ -76,7 +76,7 @@ export default function AuthCallback() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-ink-base p-6 text-fg">
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-copper text-ink-base">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent text-ink-base">
         <Clapperboard className="h-6 w-6" strokeWidth={2.25} aria-hidden="true" />
       </span>
       <div role="alert" className="w-full max-w-md space-y-4 rounded-2xl border border-vermilion/30 bg-vermilion/5 p-6 text-center">

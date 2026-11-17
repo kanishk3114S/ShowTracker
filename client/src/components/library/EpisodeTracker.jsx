@@ -7,13 +7,13 @@ import Tabs from '../ui/Tabs';
 import ProgressBar, { progressPercent } from '../ui/ProgressBar';
 import { Skeleton } from '../ui/Skeleton';
 import {
-  getMediaSeasons,
   markEpisodeWatched,
   markEpisodeUnwatched,
   markSeasonWatched,
   toApiError
 } from '../../services/api';
-import { useApiResource } from '../../hooks/useApiResource';
+import { R } from '../../services/resources';
+import { useResource } from '../../hooks/useApiResource';
 import { formatDate } from '../media/mediaUtils';
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -29,7 +29,7 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
  * Props: entry, mediaId, watchedIds (Set), onLocalChange(ids, watched, delta), onProgress(summary, ids, watched)
  */
 export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChange, onProgress }) {
-  const { data, error, loading, reload } = useApiResource((signal) => getMediaSeasons(mediaId, signal), [mediaId]);
+  const { data, error, loading, reload } = useResource(R.seasons(mediaId));
   const [chosenSeason, setChosenSeason] = useState(null);
   const [pending, setPending] = useState(() => new Set());
   const [actionError, setActionError] = useState(null);
@@ -168,16 +168,22 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
                   aria-checked={isWatched}
                   aria-label={`Episode ${episode.episodeNumber}: ${episode.title}`}
                   onClick={() => toggleEpisode(episode)}
-                  className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
-                    isWatched ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-ink-edge bg-ink-surface hover:border-[#3b455e]'
+                  className={`flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition duration-200 ${
+                    isWatched
+                      ? 'border-accent/25 bg-accent/[0.06]'
+                      : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]'
                   }`}
                 >
                   <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border transition ${
-                      isWatched ? 'border-emerald-500 bg-emerald-500 text-ink-base' : 'border-[#3b455e] text-transparent'
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${
+                      isWatched ? 'border-accent bg-accent text-ink-base' : 'border-white/25 text-transparent'
                     }`}
                   >
-                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin text-fg" aria-hidden="true" /> : <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />}
+                    {busy ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-fg" aria-hidden="true" />
+                    ) : (
+                      <Check key={String(isWatched)} className={`h-3.5 w-3.5 ${isWatched ? 'animate-check-pop' : ''}`} strokeWidth={3.5} aria-hidden="true" />
+                    )}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-fg">

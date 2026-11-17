@@ -24,7 +24,7 @@ export default function Credits() {
             Movie and TV metadata, posters and ratings. TMDB&rsquo;s free API is for non-commercial use with attribution; commercial use
             requires a license from TMDB.
           </p>
-          <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm text-copper transition hover:text-copper-hover">
+          <a href="https://www.themoviedb.org" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm text-accent transition hover:text-accent-hover">
             themoviedb.org
           </a>
         </Card>
@@ -32,7 +32,7 @@ export default function Credits() {
         <Card>
           <h2 className="mb-2 text-base font-semibold text-fg">AniList</h2>
           <p className="text-sm text-fg-muted">Anime metadata, cover images, scores and trending rankings, from the public AniList GraphQL API.</p>
-          <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm text-copper transition hover:text-copper-hover">
+          <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm text-accent transition hover:text-accent-hover">
             anilist.co
           </a>
         </Card>

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Eye, EyeOff, Globe, Library as LibraryIcon, Lock, LogOut, Save, Settings as SettingsIcon } from 'lucide-react';
 import Container from '../../components/layout/Container';
 import PageHeader from '../../components/layout/PageHeader';
-import Avatar from '../../components/ui/Avatar';
+import AvatarUploader from '../../components/profile/AvatarUploader';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
 import Switch from '../../components/ui/Switch';
@@ -12,11 +12,11 @@ import { useAuth } from '../../hooks/useAuth';
 import { updateMyProfile } from '../../services/api';
 
 const fieldClass =
-  'w-full rounded-xl border border-ink-edge bg-ink-raised px-4 py-2.5 text-[15px] text-fg placeholder-fg-subtle outline-none transition focus:border-copper/70 focus:ring-2 focus:ring-copper/20';
+  'w-full rounded-xl border border-ink-edge bg-ink-raised px-4 py-2.5 text-[15px] text-fg placeholder-fg-subtle outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20';
 
 /** What a stranger sees, given the two privacy switches. Mirrors the server's rules exactly. */
 function PrivacyPreview({ profilePublic, libraryPublic, username }) {
-  let tone = 'green';
+  let tone = 'neutral';
   let title;
   let lines;
   if (!profilePublic) {
@@ -24,14 +24,14 @@ function PrivacyPreview({ profilePublic, libraryPublic, username }) {
     title = 'Nobody can open your profile';
     lines = ['Your profile page shows "This profile is private" to everyone else.', 'Your library and statistics are hidden too, whatever the library switch says.'];
   } else if (!libraryPublic) {
-    tone = 'amber';
+    tone = 'neutral';
     title = 'Strangers see your profile, not your library';
     lines = ['Visible: username, display name, avatar, bio and join date.', 'Hidden: saved titles, watched episodes and statistics.'];
   } else {
     title = 'Strangers see your profile and library';
     lines = ['Visible: profile details, saved titles with status, rating and progress, and your statistics.', 'Always private: your personal notes.'];
   }
-  const border = { green: 'border-emerald-500/30 bg-emerald-500/5', amber: 'border-amber/30 bg-amber/5', red: 'border-vermilion/30 bg-vermilion/5' }[tone];
+  const border = tone === 'red' ? 'border-red-400/25 bg-red-500/[0.05]' : 'border-white/10 bg-white/[0.03]';
   return (
     <div className={`rounded-xl border p-4 ${border}`} aria-live="polite">
       <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">Privacy preview</p>
@@ -42,7 +42,7 @@ function PrivacyPreview({ profilePublic, libraryPublic, username }) {
         ))}
       </ul>
       {profilePublic && username && (
-        <Button as={Link} to={`/u/${username}`} variant="ghost" size="sm" className="mt-3 !px-0 text-copper hover:!bg-transparent" leftIcon={Eye}>
+        <Button as={Link} to={`/u/${username}`} variant="ghost" size="sm" className="mt-3 !px-0 text-accent hover:!bg-transparent" leftIcon={Eye}>
           Open your public page
         </Button>
       )}
@@ -52,10 +52,10 @@ function PrivacyPreview({ profilePublic, libraryPublic, username }) {
 
 function PrivacyRow({ icon: Icon, title, description, checked, onChange, id }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-ink-edge bg-ink-raised/60 p-4">
+    <div className="flex items-start justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
       <div className="flex gap-3">
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ink-edge bg-ink-surface">
-          <Icon className="h-4 w-4 text-copper" aria-hidden="true" />
+        <span className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300 ${checked ? 'bg-accent/15 text-accent' : 'bg-white/[0.06] text-fg-muted'}`}>
+          <Icon className="h-4 w-4" aria-hidden="true" />
         </span>
         <div>
           <p id={`${id}-label`} className="text-sm font-semibold text-fg">
@@ -77,7 +77,6 @@ function SettingsForm({ profile }) {
 
   const [displayName, setDisplayName] = useState(profile.display_name || '');
   const [bio, setBio] = useState(profile.bio || '');
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '');
   const [profilePublic, setProfilePublic] = useState((profile.profile_visibility || 'PUBLIC') === 'PUBLIC');
   const [libraryPublic, setLibraryPublic] = useState((profile.library_visibility || 'PUBLIC') === 'PUBLIC');
 
@@ -88,7 +87,6 @@ function SettingsForm({ profile }) {
   const dirty =
     displayName !== (profile.display_name || '') ||
     bio !== (profile.bio || '') ||
-    avatarUrl !== (profile.avatar_url || '') ||
     profilePublic !== ((profile.profile_visibility || 'PUBLIC') === 'PUBLIC') ||
     libraryPublic !== ((profile.library_visibility || 'PUBLIC') === 'PUBLIC');
 
@@ -101,7 +99,6 @@ function SettingsForm({ profile }) {
       await updateMyProfile({
         display_name: displayName.trim() || null,
         bio: bio.trim() || null,
-        avatar_url: avatarUrl.trim() || null,
         profile_visibility: profilePublic ? 'PUBLIC' : 'PRIVATE',
         library_visibility: libraryPublic ? 'PUBLIC' : 'PRIVATE'
       });
@@ -131,12 +128,12 @@ function SettingsForm({ profile }) {
           <h2 className="text-base font-semibold text-fg">Profile information</h2>
           <p className="mt-1 text-sm text-fg-muted">This is how you appear on your public profile.</p>
 
-          <div className="mt-5 flex items-center gap-4">
-            <Avatar src={avatarUrl.trim() || null} name={displayName || profile.username} size="lg" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-fg">{displayName.trim() || `@${profile.username}`}</p>
-              <p className="text-xs text-fg-subtle">@{profile.username}</p>
-            </div>
+          <div className="mt-5">
+            <p className="mb-2 text-sm font-medium text-fg">Profile picture</p>
+            <AvatarUploader profile={profile} />
+            <p className="mt-1 truncate text-xs text-fg-subtle">
+              {displayName.trim() || `@${profile.username}`} · @{profile.username}
+            </p>
           </div>
 
           <div className="mt-5 grid gap-5">
@@ -145,13 +142,6 @@ function SettingsForm({ profile }) {
                 Display name
               </label>
               <input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={80} className={fieldClass} placeholder="Your name" />
-            </div>
-            <div>
-              <label htmlFor="avatarUrl" className="mb-1.5 block text-sm font-medium text-fg">
-                Avatar image URL
-              </label>
-              <input id="avatarUrl" type="url" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} className={fieldClass} placeholder="https://…" />
-              <p className="mt-1 text-xs text-fg-subtle">A link to an image. Leave empty to use your initial.</p>
             </div>
             <div>
               <label htmlFor="bio" className="mb-1.5 block text-sm font-medium text-fg">

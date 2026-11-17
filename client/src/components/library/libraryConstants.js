@@ -11,4 +11,4 @@ export const RATING_OPTIONS = Array.from({ length: 20 }, (_, i) => 10 - i * 0.5)
 export const NOTES_MAX = 2000;
 
 export const fieldClass =
-  'h-10 w-full rounded-lg border border-ink-edge bg-ink-raised px-3 text-sm text-fg outline-none transition focus:border-copper/70 focus:ring-2 focus:ring-copper/20 disabled:opacity-50';
+  'h-10 w-full rounded-xl border border-white/10 bg-white/[0.06] px-3 text-sm text-fg outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20 disabled:opacity-50';

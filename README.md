@@ -5,6 +5,11 @@
 **One account. One library. Everything you watch.**
 
 Discover anime, movies and TV shows from one cinematic interface, powered by real data from AniList and TMDB.
+Track what you watch, episode by episode, and share a profile you are proud of.
+
+<br />
+
+<img src="docs/screenshots/landing.jpg" alt="ShowTracker landing page: a floating collage of anime, movie and TV posters beside the headline 'Your watchlist. Your stories. Your universe.'" width="100%" />
 
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
 ![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
@@ -12,6 +17,8 @@ Discover anime, movies and TV shows from one cinematic interface, powered by rea
 ![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)
 ![Postgres](https://img.shields.io/badge/PostgreSQL-Supabase-3ECF8E?logo=supabase&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3-06B6D4?logo=tailwindcss&logoColor=white)
+
+[Features](#-features) · [Screenshots](#-screenshots) · [Profiles](#-profiles--avatars) · [Architecture](#-architecture) · [Getting started](#-getting-started) · [API](#-api) · [Testing](#-testing)
 
 </div>
 
@@ -32,8 +39,61 @@ Discover anime, movies and TV shows from one cinematic interface, powered by rea
 | ✅ **Episode tracking** for anime and TV (seasons, per-episode and per-season, auto status) | ✅ Done |
 | 📊 **Live statistics** (titles, episodes watched, completions, average rating), *Continue watching* and *Recently updated* shelves | ✅ Done |
 | 🔒 **Independent privacy**: profile and library visibility are separate switches; notes are never public | ✅ Done |
+| 🖼️ **Profile pictures**: upload from your device (drag and drop, instant preview, auto-crop) to Supabase Storage | ✅ Done |
+| 🏅 **Profile showcase**: featured favorites, milestone badges, viewing mix, poster-tinted banner | ✅ Done |
 | 🎬 **Cinematic Editorial Premium UI**: design system, motion, responsive shell and mobile dock | ✅ Done |
 | 🌐 Followers, social feeds, recommendations | 🛠️ Planned (later phases) |
+
+---
+
+## 📸 Screenshots
+
+Real captures of the running app (live AniList and TMDB data).
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/trending.jpg" alt="Trending page with a featured hero and a poster grid" /></td>
+    <td width="50%"><img src="docs/screenshots/explore.jpg" alt="Explore page showing search results for Naruto" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub><b>Trending</b>: TMDB daily/weekly lists and AniList's ranking, with a featured hero</sub></td>
+    <td align="center"><sub><b>Explore</b>: unified search across anime, movies and TV with genre and year filters</sub></td>
+  </tr>
+</table>
+
+### On your phone
+
+The layout adapts to small screens with a bottom dock that never covers content, a footer that stays above it, and no horizontal scrolling.
+
+<table>
+  <tr>
+    <td width="33%"><img src="docs/screenshots/mobile-landing.jpg" alt="Mobile landing page" /></td>
+    <td width="33%"><img src="docs/screenshots/mobile-trending.jpg" alt="Mobile trending page" /></td>
+    <td width="33%"><img src="docs/screenshots/mobile-explore.jpg" alt="Mobile explore page with the bottom dock" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Home</sub></td>
+    <td align="center"><sub>Trending</sub></td>
+    <td align="center"><sub>Explore</sub></td>
+  </tr>
+</table>
+
+---
+
+## 👤 Profiles & avatars
+
+Every user gets a public page at `/u/<username>`, controlled by two **independent** privacy switches (profile and library). Owners get an *Edit profile & privacy* dialog right on the page.
+
+| | |
+|---|---|
+| 🖼️ **Avatar upload** | Click or drag a JPEG, PNG or WebP (max 5 MB). You get an instant circular preview; the image is centre-cropped to a 512 px square, re-encoded, and uploaded to the public `avatars` Supabase Storage bucket under your own `<user id>/` folder. The previous file is cleaned up. |
+| 🔗 **Graceful fallback** | If storage is unavailable, paste an image link instead, with a live preview. |
+| ❤️ **Featured favorites** | Your favorite titles (best rated first) as a poster shelf. With no favorites it shows your top rated titles. |
+| 🏅 **Milestone badges** | Earned tiers for titles saved, titles finished, episodes watched and titles rated, plus the next locked goal with progress. |
+| 📊 **Viewing mix** | Share of anime, movies and TV in the library and your average rating. |
+| 🎨 **Poster-tinted banner** | The banner is built from your top title's artwork. |
+
+Storage is protected by Row Level Security ([migration 006](supabase/migrations/006_create_avatars_storage.sql)): anyone can read avatars, but a signed-in user can only write inside their own folder. Notes always stay private.
 
 ---
 
@@ -256,6 +316,7 @@ AniList documents 90 requests/minute (currently degraded to 30). The adapter rea
 | [`003_create_seasons_and_episodes.sql`](supabase/migrations/003_create_seasons_and_episodes.sql) | `seasons`, `episodes` (shared catalog) |
 | [`004_create_user_library_and_progress.sql`](supabase/migrations/004_create_user_library_and_progress.sql) | `user_library`, `user_episode_progress` (per-user, RLS forced) |
 | [`005_create_public_library_view.sql`](supabase/migrations/005_create_public_library_view.sql) | `public_library_entries` view: the only way visitors read a library (no `notes` column) |
+| [`006_create_avatars_storage.sql`](supabase/migrations/006_create_avatars_storage.sql) | Public `avatars` Storage bucket (5 MB, images only) with owner-folder write policies |
 
 ```mermaid
 erDiagram
@@ -278,25 +339,44 @@ The catalog (including seasons and episodes) is **shared** data: one row per tit
 
 ## 🎨 Design system
 
-**Cinematic Editorial Premium**: deep charcoal surfaces, warm off-white text, one restrained copper accent, crisp hairline borders, real artwork only (never invented), purposeful motion.
+**Restrained and cinematic:** neutral near-black surfaces, white type, and exactly **one accent: warm gold**. Color is reserved for meaning, so the artwork is the most colorful thing on every screen. No decorative gradients, no rainbow glows.
 
-| Token | Value |
-|---|---|
-| Page / surface / raised | `#0B0E14` / `#12161F` / `#181F2B` (`ink-base`, `ink-surface`, `ink-raised`) |
-| Borders | `#1F2633` hairlines, `#2A3245` components (`ink-line`, `ink-edge`) |
-| Text | `#F3F4F6` primary, `#9CA3AF` muted, `#6B7280` subtle (`fg`, `fg-muted`, `fg-subtle`) |
-| Accent | copper `#E07A5F` (primary actions), amber `#F59E0B` (ratings), vermilion `#E50914` (destructive only) |
-| Type | Inter, confident weights, tight tracking on headings |
+| Token | Value | Used for |
+|---|---|---|
+| `ink-base` / `surface` / `raised` | `#09090B` / `#111113` / `#18181B` | page, cards, inputs and menus |
+| `ink-line` / `edge` | `#1F1F23` / `#2A2A30` | hairlines, component borders |
+| `fg` / `muted` / `subtle` | `#FAFAFA` / `#A1A1AA` / `#71717A` | text hierarchy |
+| `accent` | `#F2B33D` (hover `#F7C566`) | primary button, active tab and nav, ratings, progress, checked episodes, links |
+| status dots | emerald (watching), sky (completed), zinc (plan), amber (on hold), red (dropped) | one small dot on a neutral pill |
 
-Reusable primitives live in `client/src/components/ui/`: `Button` (primary / secondary / ghost / outline / destructive, loading + icon slots), `Badge` / `StatusBadge`, `Card`, `Modal` (focus trap, ESC, scroll lock, focus restore), `Tabs` (sliding pill, arrow keys), `Switch`, `ProgressBar`, `Skeleton`, `Avatar`, `Logo` and the `Reveal` / `Stagger` motion helpers. All motion honors `prefers-reduced-motion` (app-wide `MotionConfig`), and routes are code-split so the first load stays small.
+Media types (Anime / Movie / TV Show) are told apart by their label, not by a color.
 
-**Application frame:** one shared shell (sticky header with user menu on desktop, bottom dock on phones, footer with TMDB attribution) wraps every page except sign-in callback, onboarding and diagnostics.
+**Texture:** fine film grain, a faint dot matrix and micro grid in hero areas, a single very soft warm light at the top of the page, and neutral frosted-glass panels with a 1px top highlight (`client/src/index.css`: `bg-dots`, `bg-grid`, `mask-radial`, `glass`, `glass-lite`, `sheen`). The only gradients left are black scrims over artwork so titles stay legible.
+
+**Motion (kept):** staggered entrances, sliding tab and nav indicators, card lift with a slow poster zoom, button press and hover sheen, count-up stat numbers, animated progress fills, circular check pop, a pulsing "live" dot on Watching, modal springs and a floating hero collage. All of it honors `prefers-reduced-motion`.
+
+Reusable primitives in `client/src/components/ui/`: `Button`, `Badge` / `CategoryBadge` / `StatusBadge`, `Card`, `Modal` (focus trap, ESC, scroll lock, focus restore), `Tabs`, `Switch`, `ProgressBar`, `CountUp`, `Skeleton`, `Avatar`, `Logo`, and the `Reveal` / `Stagger` helpers. Tokens live in `client/tailwind.config.js` and `components/ui/theme.js`.
+
+**Application frame:** one shared shell (sticky glass header with user menu on desktop, bottom dock on phones, footer with TMDB attribution) wraps every page except sign-in callback, onboarding and diagnostics.
+
+## ⚡ Speed
+
+The database lives far away (a round trip is ~0.3 s and opening a connection ~2.5 s from some locations), so the app is built to avoid waiting:
+
+- **Instant return visits.** An in-memory stale-while-revalidate cache (`client/src/lib/queryCache.js`) shows the last known data immediately and refreshes it quietly in the background. Changing your library or profile marks private data stale; signing out wipes everything.
+- **Prefetch before you click.** Page code is downloaded in idle time after the first paint; hovering (or focusing/touching) a navigation link or poster starts loading its page data too. A hovered title opens in ~150 ms instead of several seconds.
+- **Instant app start.** Your profile (name, avatar, username, privacy flags; never tokens) is remembered in `localStorage`, so a returning signed-in user sees the app immediately while it is confirmed in the background.
+- **Fewer database round trips.** The per-user transaction sends `BEGIN` and the identity claims together and, for reads, does not wait for the closing `COMMIT` (writes always do). A typical read request is about 2x faster.
+- **Warm connections.** The backend keeps three connections open (TCP keep-alive, periodic ping, pre-opened at startup) so requests don't pay the cold-connection cost. Titles already saved to the catalog are not saved again for 6 hours.
+- **Small bundle.** Pages are code-split; the main bundle is ~130 kB gzipped.
+
+`node test/bench-latency.mjs` (in `server/`) measures the transaction improvement against your real database.
 
 ## 🧪 Testing
 
 ```bash
 cd server
-npm test            # API + mocked media tests + library and stats/privacy integration tests (needs the database; ~6 min)
+npm test            # API + mocked media tests + library and stats/privacy integration tests (needs the database; ~5 min)
 npm run test:db     # real-database checks for migration 002 (constraints, grants, upserts)
 npm run test:live   # REAL AniList and TMDB calls + catalog persistence (TMDB needs a token)
 
@@ -325,6 +405,8 @@ taskkill /PID <pid> /F
 ```
 client/src/
   components/{layout,media}   shared UI (cards, tabs, filters, skeletons, header, footer)
+  components/profile/         avatar uploader, edit-profile dialog, favorites / milestones / viewing mix
+  lib/avatarUpload.js         validate, crop, compress and upload avatars to Supabase Storage
   pages/                      Landing, Dashboard, Explore, Trending, MediaDetails, Credits, ...
   hooks/useApiResource.js     debounce + abort/stale-response protection
   services/api.js             the only module that calls the backend
@@ -349,5 +431,5 @@ Movie and TV data, posters and ratings come from [TMDB](https://www.themoviedb.o
 ---
 
 <div align="center">
-<sub>Built with React, Express and PostgreSQL · Phase 5 complete</sub>
+<sub>Built with React, Express and PostgreSQL · Phase 5 complete + profile upgrade</sub>
 </div>
