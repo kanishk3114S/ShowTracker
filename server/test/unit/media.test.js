@@ -332,3 +332,46 @@ test('normalizer: anime episodes are generated 1..N, capped, and aired count is 
   assert.equal(n.anilistKnownEpisodeCount({ episodes: null, nextAiringEpisode: { episode: 1 } }), null);
   assert.equal(n.anilistKnownEpisodeCount({}), null);
 });
+
+// ------------------------------------------------------- multi-genre filter ---
+
+test('multi-genre: TMDB browse uses "|" (match any), unknown names are dropped, none known -> empty', async () => {
+  mockFetch([
+    ['/genre/movie/list', json(tmdbGenres)],
+    ['/discover/movie', json(tmdbPage([tmdbMovie]))]
+  ]);
+  let res = await request(app).get('/api/media/search?type=MOVIE&genre=Action,Drama,Nonsense');
+  assert.equal(res.status, 200);
+  const url = decodeURIComponent(calls.find((c) => c.url.includes('/discover/movie')).url);
+  assert.ok(url.includes('with_genres=28|18'), url);
+
+  cache.clear();
+  calls.length = 0;
+  mockFetch([['/genre/movie/list', json(tmdbGenres)]]); // fresh Response objects (a body can be read once)
+  res = await request(app).get('/api/media/search?type=MOVIE&genre=Nonsense');
+  assert.equal(res.body.data.groups[0].results.length, 0);
+  assert.ok(!calls.some((c) => c.url.includes('/discover/movie')), 'no provider call when no genre is known');
+});
+
+test('multi-genre: AniList receives genre_in with only genres AniList supports', async () => {
+  mockFetch([
+    [
+      'graphql.anilist.co',
+      (url, opts) => {
+        const body = JSON.parse(opts.body);
+        if (body.query.includes('GenreCollection')) return json({ data: { GenreCollection: ['Action', 'Comedy', 'Drama'] } });
+        return json(aniPage([aniMedia()]));
+      }
+    ]
+  ]);
+  const res = await request(app).get('/api/media/search?type=ANIME&genre=action,Comedy,Science%20Fiction');
+  assert.equal(res.status, 200);
+  const listCall = calls.map((c) => JSON.parse(c.opts.body)).find((b) => b.query.includes('genre_in'));
+  assert.deepEqual(listCall.variables.genres, ['Action', 'Comedy']);
+});
+
+test('multi-genre: validation limits and rejects bad names', async () => {
+  assert.equal((await request(app).get('/api/media/search?genre=a,b,c,d,e,f')).status, 400);
+  assert.equal((await request(app).get('/api/media/search?genre=Action;DROP')).status, 400);
+  assert.equal((await request(app).get('/api/media/search?genre=%2C%2C')).status, 400);
+});

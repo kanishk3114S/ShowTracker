@@ -13,7 +13,14 @@ export const usernameSchema = z
 export const updateProfileSchema = z.object({
   username: usernameSchema.optional(),
   display_name: z.string().trim().max(80, 'Display name cannot exceed 80 characters.').nullable().optional(),
-  avatar_url: z.string().trim().url('Avatar must be a valid URL.').nullable().optional().or(z.literal('')),
+  avatar_url: z
+    .string()
+    .trim()
+    .url('Avatar must be a valid URL.')
+    .refine((v) => /^https?:\/\//i.test(v), { message: 'Avatar must be an http(s) URL.' })
+    .nullable()
+    .optional()
+    .or(z.literal('')),
   bio: z.string().trim().max(300, 'Bio cannot exceed 300 characters.').nullable().optional(),
   profile_visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
   library_visibility: z.enum(['PUBLIC', 'PRIVATE']).optional()

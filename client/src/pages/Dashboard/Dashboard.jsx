@@ -1,255 +1,164 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { CheckCircle2, Clapperboard, Compass, Library as LibraryIcon, PlayCircle, Star, Tv } from 'lucide-react';
+import Container from '../../components/layout/Container';
+import Button from '../../components/ui/Button';
+import Badge from '../../components/ui/Badge';
+import { Reveal, Stagger } from '../../components/ui/motion';
+import { Skeleton } from '../../components/ui/Skeleton';
+import StatCard from '../../components/dashboard/StatCard';
+import ContinueWatchingShelf from '../../components/dashboard/ContinueWatchingShelf';
+import RecentlyUpdatedGrid from '../../components/dashboard/RecentlyUpdatedGrid';
+import QuickDiscovery from '../../components/dashboard/QuickDiscovery';
+import EmptyState from '../../components/media/EmptyState';
+import ProviderErrorState from '../../components/media/ProviderErrorState';
+import { getLibraryStats, getContinueWatching, getRecentlyUpdated } from '../../services/api';
+import { useApiResource } from '../../hooks/useApiResource';
 import { useAuth } from '../../hooks/useAuth';
-import { 
-  Film, 
-  User, 
-  Settings, 
-  LogOut, 
-  ExternalLink, 
-  Activity, 
-  ShieldCheck, 
-  CheckCircle2, 
-  Calendar,
-  Sparkles,
-  Lock,
-  Globe
-} from 'lucide-react';
+
+function SectionHeading({ title, to, linkLabel }) {
+  return (
+    <div className="mb-4 flex items-end justify-between gap-3">
+      <h2 className="text-xl font-semibold tracking-tight text-fg">{title}</h2>
+      {to && (
+        <Link to={to} className="text-sm font-medium text-copper transition hover:text-copper-hover">
+          {linkLabel}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div role="status" aria-label="Loading your dashboard" className="space-y-10">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Skeleton key={i} className="h-32 rounded-xl" />
+        ))}
+      </div>
+      <div className="flex gap-4 overflow-hidden">
+        {Array.from({ length: 3 }, (_, i) => (
+          <Skeleton key={i} className="aspect-video w-[19rem] shrink-0 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile } = useAuth();
+  const stats = useApiResource((signal) => getLibraryStats(signal), []);
+  const shelf = useApiResource((signal) => getContinueWatching(signal), []);
+  const recent = useApiResource((signal) => getRecentlyUpdated(signal), []);
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (err) {
-      console.error('Sign out failed:', err.message);
-    }
+  const fullName = profile?.display_name || user?.user_metadata?.full_name || profile?.username || 'there';
+  const firstName = fullName.split(' ')[0];
+  const s = stats.data;
+  const loading = (stats.loading && !s) || (shelf.loading && !shelf.data) || (recent.loading && !recent.data);
+  const error = stats.error || shelf.error || recent.error;
+  const reloadAll = () => {
+    stats.reload();
+    shelf.reload();
+    recent.reload();
   };
 
-  const displayName = profile?.display_name || user?.user_metadata?.full_name || 'ShowTracker Explorer';
-  const username = profile?.username;
-  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
-  const isProfilePublic = profile?.profile_visibility === 'PUBLIC';
-  const isLibraryPublic = profile?.library_visibility === 'PUBLIC';
-
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-[#F3F4F6] flex flex-col font-sans selection:bg-red-500 selection:text-white">
-      {/* Top Navbar */}
-      <header className="border-b border-[#2A3245] bg-[#151922]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center shadow-lg shadow-red-900/30">
-              <Film className="w-5 h-5 text-white" />
-            </div>
+    <Container className="py-8 sm:py-10">
+      {/* Welcome hero */}
+      <Reveal>
+        <div className="relative overflow-hidden rounded-2xl border border-ink-edge bg-ink-surface p-6 sm:p-8">
+          <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-copper/10 blur-3xl" aria-hidden="true" />
+          <div className="relative flex flex-wrap items-end justify-between gap-6">
             <div>
-              <div className="flex items-center space-x-2">
-                <span className="text-xl font-bold tracking-tight text-white">ShowTracker</span>
-                <span className="text-xs uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-emerald-950/70 border border-emerald-800/60 text-emerald-400">
-                  Phase 4 Active
-                </span>
-              </div>
-              <p className="text-xs text-[#9CA3AF]">Logged in as @{username}</p>
+              <p className="text-sm font-medium text-copper">Dashboard</p>
+              <h1 className="mt-1 text-3xl font-bold tracking-tight text-fg sm:text-4xl">Welcome back, {firstName}</h1>
+              <p className="mt-2 text-sm text-fg-muted">
+                {s
+                  ? s.totalItems > 0
+                    ? `${s.totalItems} ${s.totalItems === 1 ? 'title' : 'titles'} · ${s.episodesWatched.toLocaleString()} ${s.episodesWatched === 1 ? 'episode' : 'episodes'} watched`
+                    : 'Your library is empty. Let us find your next favorite.'
+                  : 'Loading your library…'}
+              </p>
             </div>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <Link
-              to="/library"
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-600 hover:bg-red-700 border border-red-500/50 text-white transition-all"
-            >
-              <span>My Library</span>
-            </Link>
-
-            <Link
-              to="/explore"
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-white transition-all"
-            >
-              <span>Explore</span>
-            </Link>
-
-            <Link
-              to="/trending"
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-white transition-all"
-            >
-              <span>Trending</span>
-            </Link>
-
-            <Link
-              to="/settings"
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-white transition-all"
-            >
-              <Settings className="w-3.5 h-3.5 text-red-400" />
-              <span>Settings</span>
-            </Link>
-
-            <Link
-              to="/health"
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-[#9CA3AF] hover:text-white transition-all"
-            >
-              <Activity className="w-3.5 h-3.5 text-red-400" />
-              <span>Health</span>
-            </Link>
-
-            <button
-              onClick={handleSignOut}
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-800/60 text-red-400 transition-all"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Sign Out</span>
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <Button as={Link} to="/explore" variant="primary" leftIcon={Compass}>
+                Explore titles
+              </Button>
+              <Button as={Link} to="/library" variant="secondary" leftIcon={LibraryIcon}>
+                My Library
+              </Button>
+            </div>
           </div>
         </div>
-      </header>
+      </Reveal>
 
-      {/* Main Container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-6 md:p-8 space-y-8">
-        
-        {/* Profile Card Hero */}
-        <section className="bg-gradient-to-r from-[#151922] via-[#1C2230] to-[#151922] border border-[#2A3245] rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-red-600/5 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex items-center space-x-5">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={displayName}
-                  className="w-20 h-20 rounded-2xl object-cover border-2 border-red-500/50 shadow-lg"
+      <div className="mt-10 space-y-12">
+        {loading ? (
+          <DashboardSkeleton />
+        ) : error && !s ? (
+          <ProviderErrorState error={error} onRetry={reloadAll} />
+        ) : (
+          <>
+            {/* Live stats */}
+            <section aria-label="Your statistics">
+              <Stagger className="grid grid-cols-2 gap-4 lg:grid-cols-5" gap={0.06}>
+                <StatCard label="Library" value={s.totalItems} icon={LibraryIcon} hint="titles saved">
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    <Badge tone="indigo">{s.byType.ANIME} Anime</Badge>
+                    <Badge tone="green">{s.byType.TV} TV</Badge>
+                    <Badge tone="copper">{s.byType.MOVIE} Movies</Badge>
+                  </div>
+                </StatCard>
+                <StatCard label="Episodes watched" value={s.episodesWatched.toLocaleString()} icon={Tv} hint="across anime and TV" />
+                <StatCard label="Completed" value={s.completed} icon={CheckCircle2} hint="finished titles" />
+                <StatCard label="Watching" value={s.watching} icon={PlayCircle} hint="in progress right now" />
+                <StatCard
+                  label="Average rating"
+                  value={s.averageRating === null ? '—' : s.averageRating.toFixed(1)}
+                  icon={Star}
+                  hint={s.ratedCount > 0 ? `from ${s.ratedCount} rated ${s.ratedCount === 1 ? 'title' : 'titles'}` : 'rate a title to see this'}
                 />
-              ) : (
-                <div className="w-20 h-20 rounded-2xl bg-[#2A3245] flex items-center justify-center text-[#9CA3AF]">
-                  <User className="w-10 h-10" />
-                </div>
-              )}
+              </Stagger>
+            </section>
 
-              <div className="space-y-1">
-                <div className="flex items-center space-x-2">
-                  <h1 className="text-2xl font-bold text-white tracking-tight">{displayName}</h1>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-red-950 border border-red-800/60 text-red-400 font-mono">
-                    @{username}
-                  </span>
-                </div>
-                <p className="text-xs text-[#9CA3AF] max-w-md">{profile?.bio || 'No bio added yet.'}</p>
-                <div className="flex items-center space-x-3 text-xs text-[#9CA3AF] pt-1">
-                  <span className="flex items-center space-x-1">
-                    <Calendar className="w-3 h-3" />
-                    <span>Joined {new Date(profile?.created_at || Date.now()).toLocaleDateString()}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-3 w-full md:w-auto">
-              {username && (
-                <Link
-                  to={`/u/${username}`}
-                  className="flex-1 md:flex-initial inline-flex items-center justify-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl bg-white text-neutral-900 hover:bg-neutral-100 transition-colors shadow-md"
-                >
-                  <span>View Public Profile</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </Link>
-              )}
-              <Link
-                to="/settings"
-                className="flex-1 md:flex-initial inline-flex items-center justify-center space-x-2 px-4 py-2 text-xs font-semibold rounded-xl bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-white transition-colors"
-              >
-                <span>Edit Profile</span>
-              </Link>
-            </div>
-          </div>
-        </section>
-
-        {/* Status & Privacy Settings Badges */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          
-          {/* Privacy Card */}
-          <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Privacy & Row Level Security Status</span>
-              </h3>
-              <span className="text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60 px-2 py-0.5 rounded-full">
-                Protected by RLS
-              </span>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="flex items-center justify-between p-3 rounded-xl bg-[#1C2230] border border-[#2A3245]">
-                <div className="flex items-center space-x-2.5">
-                  {isProfilePublic ? (
-                    <Globe className="w-4 h-4 text-emerald-400" />
+            {s.totalItems === 0 ? (
+              <EmptyState
+                icon={Clapperboard}
+                title="Start your library"
+                message="Find an anime, movie or series you love, add it to your library, and your stats and progress will appear here."
+                action={
+                  <Button as={Link} to="/explore" variant="primary" leftIcon={Compass}>
+                    Explore titles
+                  </Button>
+                }
+              />
+            ) : (
+              <>
+                <section aria-label="Continue watching">
+                  <SectionHeading title="Continue watching" to="/library?status=WATCHING" linkLabel="View all" />
+                  {shelf.data?.length ? (
+                    <ContinueWatchingShelf items={shelf.data} />
                   ) : (
-                    <Lock className="w-4 h-4 text-amber-400" />
+                    <p className="rounded-xl border border-dashed border-ink-edge px-4 py-8 text-center text-sm text-fg-muted">
+                      Nothing in progress. Set a title to <span className="text-fg">Watching</span> and it will show up here.
+                    </p>
                   )}
-                  <div>
-                    <p className="font-semibold text-white">Profile Visibility</p>
-                    <p className="text-[#9CA3AF]">Controls public access to your page at /u/{username}</p>
-                  </div>
-                </div>
-                <span className={`font-mono font-bold px-2 py-0.5 rounded ${isProfilePublic ? 'text-emerald-400 bg-emerald-950/50' : 'text-amber-400 bg-amber-950/50'}`}>
-                  {profile?.profile_visibility}
-                </span>
-              </div>
+                </section>
 
-              <div className="flex items-center justify-between p-3 rounded-xl bg-[#1C2230] border border-[#2A3245]">
-                <div className="flex items-center space-x-2.5">
-                  {isLibraryPublic ? (
-                    <Globe className="w-4 h-4 text-emerald-400" />
-                  ) : (
-                    <Lock className="w-4 h-4 text-amber-400" />
-                  )}
-                  <div>
-                    <p className="font-semibold text-white">Library Visibility</p>
-                    <p className="text-[#9CA3AF]">Protects your watched titles, ratings & private notes</p>
-                  </div>
-                </div>
-                <span className={`font-mono font-bold px-2 py-0.5 rounded ${isLibraryPublic ? 'text-emerald-400 bg-emerald-950/50' : 'text-amber-400 bg-amber-950/50'}`}>
-                  {profile?.library_visibility}
-                </span>
-              </div>
-            </div>
-          </div>
+                {recent.data?.length > 0 && (
+                  <section aria-label="Recently updated">
+                    <SectionHeading title="Recently updated" to="/library" linkLabel="Open library" />
+                    <RecentlyUpdatedGrid items={recent.data} />
+                  </section>
+                )}
+              </>
+            )}
 
-          {/* Phase Roadmap Card */}
-          <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-white flex items-center space-x-2">
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>Next Milestone: Phase 3 Media Discovery</span>
-              </h3>
-              <span className="text-xs text-[#9CA3AF]">Upcoming</span>
-            </div>
-
-            <p className="text-xs text-[#9CA3AF] leading-relaxed">
-              Phase 2 Google Authentication and Onboarding is complete! Real catalog exploration (AniList GraphQL for Anime and TMDB API for Movies & Series) will arrive in Phase 3.
-            </p>
-
-            <div className="space-y-2 text-xs">
-              <div className="flex items-center space-x-2 text-emerald-400 font-medium">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Google OAuth + Supabase Auth Session Lifecycle Active</span>
-              </div>
-              <div className="flex items-center space-x-2 text-emerald-400 font-medium">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Profile Onboarding with Unique Handle Verification Active</span>
-              </div>
-              <div className="flex items-center space-x-2 text-[#9CA3AF]">
-                <span className="w-4 h-4 rounded-full border border-[#2A3245] flex items-center justify-center text-[10px]">3</span>
-                <span>AniList & TMDB Catalog Adapters & Normalized Search</span>
-              </div>
-            </div>
-          </div>
-
-        </section>
-
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-[#2A3245] bg-[#151922] py-4 px-6 text-center text-xs text-[#9CA3AF]">
-        <span>ShowTracker &bull; Phase 2 Completed &bull; Ready for Phase 3</span>
-      </footer>
-    </div>
+            <QuickDiscovery />
+          </>
+        )}
+      </div>
+    </Container>
   );
 }

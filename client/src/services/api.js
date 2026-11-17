@@ -68,10 +68,11 @@ export async function updateMyProfile(profileData) {
 
 /**
  * GET /api/users/:username
- * Public profile lookup
+ * Public profile lookup. Returns { profile, library, stats, library_is_private, isOwner }.
+ * The server decides what the caller may see (private profile = 404, private library = empty).
  */
-export async function getPublicProfile(username) {
-  const res = await apiClient.get(`/users/${encodeURIComponent(username)}`);
+export async function getPublicProfile(username, params = {}, signal) {
+  const res = await apiClient.get(`/users/${encodeURIComponent(username)}`, { params: cleanParams(params), signal });
   return res.data;
 }
 
@@ -96,7 +97,9 @@ const cleanParams = (params) =>
   Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''));
 
 export async function searchMedia(params, signal) {
-  const res = await apiClient.get('/media/search', { params: cleanParams(params), signal });
+  // `genre` may be an array of names; the API takes a comma-separated list meaning "any of these".
+  const genre = Array.isArray(params.genre) ? params.genre.join(',') : params.genre;
+  const res = await apiClient.get('/media/search', { params: cleanParams({ ...params, genre }), signal });
   return res.data.data;
 }
 
@@ -129,6 +132,22 @@ export async function getMyLibrary(params, signal) {
 /** -> { entry | null, watchedEpisodeIds: [] } */
 export async function checkLibraryEntry(mediaId, signal) {
   const res = await apiClient.get(`/library/check/${encodeURIComponent(mediaId)}`, { signal });
+  return res.data.data;
+}
+
+/** Live statistics for the signed-in user (derived from the database on every call). */
+export async function getLibraryStats(signal) {
+  const res = await apiClient.get('/library/stats', { signal });
+  return res.data.data;
+}
+
+export async function getContinueWatching(signal) {
+  const res = await apiClient.get('/library/continue-watching', { signal });
+  return res.data.data;
+}
+
+export async function getRecentlyUpdated(signal) {
+  const res = await apiClient.get('/library/recently-updated', { signal });
   return res.data.data;
 }
 
@@ -171,6 +190,9 @@ export default {
   apiClient,
   checkApiHealth,
   getMe,
+  getLibraryStats,
+  getContinueWatching,
+  getRecentlyUpdated,
   checkUsernameAvailability,
   updateMyProfile,
   getPublicProfile

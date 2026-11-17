@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../hooks/useAuth';
-import { Film, Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle, Clapperboard } from 'lucide-react';
+import FullScreenLoader from '../../components/ui/FullScreenLoader';
+import Button from '../../components/ui/Button';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -70,37 +72,21 @@ export default function AuthCallback() {
     handleAuthCallback();
   }, [navigate, searchParams, refreshProfile]);
 
-  return (
-    <div className="min-h-screen bg-[#0B0E14] text-[#F3F4F6] flex flex-col items-center justify-center p-6 space-y-6">
-      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center shadow-xl shadow-red-950/40">
-        <Film className="w-7 h-7 text-white" />
-      </div>
+  if (!errorMsg) return <FullScreenLoader message="Completing Google sign-in…" />;
 
-      {errorMsg ? (
-        <div className="bg-red-950/30 border border-red-800/50 rounded-2xl p-6 max-w-md w-full space-y-4 text-center">
-          <div className="w-10 h-10 rounded-full bg-red-900/60 flex items-center justify-center mx-auto text-red-400">
-            <AlertCircle className="w-5 h-5" />
-          </div>
-          <h2 className="text-lg font-bold text-white">Authentication Failed</h2>
-          <p className="text-xs text-red-300 leading-relaxed">{errorMsg}</p>
-          <button
-            onClick={() => navigate('/', { replace: true })}
-            className="w-full py-2.5 px-4 rounded-xl bg-white text-neutral-900 text-xs font-semibold hover:bg-neutral-100 transition-colors"
-          >
-            Return to Landing Page
-          </button>
-        </div>
-      ) : (
-        <div className="text-center space-y-3">
-          <div className="flex items-center justify-center space-x-2 text-sm text-[#9CA3AF]">
-            <Loader2 className="w-4 h-4 animate-spin text-red-500" />
-            <span className="font-medium text-white">Completing Google sign-in...</span>
-          </div>
-          <p className="text-xs text-[#9CA3AF] max-w-xs">
-            Verifying your authentication token and syncing your ShowTracker profile.
-          </p>
-        </div>
-      )}
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-ink-base p-6 text-fg">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-copper text-ink-base">
+        <Clapperboard className="h-6 w-6" strokeWidth={2.25} aria-hidden="true" />
+      </span>
+      <div role="alert" className="w-full max-w-md space-y-4 rounded-2xl border border-vermilion/30 bg-vermilion/5 p-6 text-center">
+        <AlertCircle className="mx-auto h-6 w-6 text-[#ff7b7b]" aria-hidden="true" />
+        <h1 className="text-lg font-bold text-fg">Sign-in didn&rsquo;t complete</h1>
+        <p className="text-sm leading-relaxed text-fg-muted">{errorMsg}</p>
+        <Button variant="primary" className="w-full" onClick={() => navigate('/', { replace: true })}>
+          Back to ShowTracker
+        </Button>
+      </div>
     </div>
   );
 }

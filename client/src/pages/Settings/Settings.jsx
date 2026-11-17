@@ -1,213 +1,242 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { CheckCircle2, Eye, EyeOff, Globe, Library as LibraryIcon, Lock, LogOut, Save, Settings as SettingsIcon } from 'lucide-react';
+import Container from '../../components/layout/Container';
+import PageHeader from '../../components/layout/PageHeader';
+import Avatar from '../../components/ui/Avatar';
+import Button from '../../components/ui/Button';
+import Card from '../../components/ui/Card';
+import Switch from '../../components/ui/Switch';
+import { Reveal } from '../../components/ui/motion';
 import { useAuth } from '../../hooks/useAuth';
 import { updateMyProfile } from '../../services/api';
-import { 
-  Film, 
-  ArrowLeft, 
-  Save, 
-  Loader2, 
-  CheckCircle2, 
-  AlertCircle, 
-  ShieldCheck, 
-  Globe, 
-  Lock 
-} from 'lucide-react';
 
-export default function Settings() {
-  const { profile, refreshProfile } = useAuth();
+const fieldClass =
+  'w-full rounded-xl border border-ink-edge bg-ink-raised px-4 py-2.5 text-[15px] text-fg placeholder-fg-subtle outline-none transition focus:border-copper/70 focus:ring-2 focus:ring-copper/20';
 
-  const [displayName, setDisplayName] = useState(profile?.display_name || '');
-  const [bio, setBio] = useState(profile?.bio || '');
-  const [profileVisibility, setProfileVisibility] = useState(profile?.profile_visibility || 'PUBLIC');
-  const [libraryVisibility, setLibraryVisibility] = useState(profile?.library_visibility || 'PUBLIC');
+/** What a stranger sees, given the two privacy switches. Mirrors the server's rules exactly. */
+function PrivacyPreview({ profilePublic, libraryPublic, username }) {
+  let tone = 'green';
+  let title;
+  let lines;
+  if (!profilePublic) {
+    tone = 'red';
+    title = 'Nobody can open your profile';
+    lines = ['Your profile page shows "This profile is private" to everyone else.', 'Your library and statistics are hidden too, whatever the library switch says.'];
+  } else if (!libraryPublic) {
+    tone = 'amber';
+    title = 'Strangers see your profile, not your library';
+    lines = ['Visible: username, display name, avatar, bio and join date.', 'Hidden: saved titles, watched episodes and statistics.'];
+  } else {
+    title = 'Strangers see your profile and library';
+    lines = ['Visible: profile details, saved titles with status, rating and progress, and your statistics.', 'Always private: your personal notes.'];
+  }
+  const border = { green: 'border-emerald-500/30 bg-emerald-500/5', amber: 'border-amber/30 bg-amber/5', red: 'border-vermilion/30 bg-vermilion/5' }[tone];
+  return (
+    <div className={`rounded-xl border p-4 ${border}`} aria-live="polite">
+      <p className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">Privacy preview</p>
+      <p className="mt-1.5 text-sm font-semibold text-fg">{title}</p>
+      <ul className="mt-2 space-y-1 text-sm text-fg-muted">
+        {lines.map((l) => (
+          <li key={l}>{l}</li>
+        ))}
+      </ul>
+      {profilePublic && username && (
+        <Button as={Link} to={`/u/${username}`} variant="ghost" size="sm" className="mt-3 !px-0 text-copper hover:!bg-transparent" leftIcon={Eye}>
+          Open your public page
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function PrivacyRow({ icon: Icon, title, description, checked, onChange, id }) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-ink-edge bg-ink-raised/60 p-4">
+      <div className="flex gap-3">
+        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-ink-edge bg-ink-surface">
+          <Icon className="h-4 w-4 text-copper" aria-hidden="true" />
+        </span>
+        <div>
+          <p id={`${id}-label`} className="text-sm font-semibold text-fg">
+            {title}: <span className={checked ? 'text-emerald-400' : 'text-fg-muted'}>{checked ? 'Public' : 'Private'}</span>
+          </p>
+          <p id={`${id}-desc`} className="mt-1 text-sm leading-relaxed text-fg-muted">
+            {description}
+          </p>
+        </div>
+      </div>
+      <Switch checked={checked} onChange={onChange} label={`${title}: ${checked ? 'public' : 'private'}`} describedBy={`${id}-desc`} />
+    </div>
+  );
+}
+
+function SettingsForm({ profile }) {
+  const { refreshProfile, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const [displayName, setDisplayName] = useState(profile.display_name || '');
+  const [bio, setBio] = useState(profile.bio || '');
+  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url || '');
+  const [profilePublic, setProfilePublic] = useState((profile.profile_visibility || 'PUBLIC') === 'PUBLIC');
+  const [libraryPublic, setLibraryPublic] = useState((profile.library_visibility || 'PUBLIC') === 'PUBLIC');
 
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+
+  const dirty =
+    displayName !== (profile.display_name || '') ||
+    bio !== (profile.bio || '') ||
+    avatarUrl !== (profile.avatar_url || '') ||
+    profilePublic !== ((profile.profile_visibility || 'PUBLIC') === 'PUBLIC') ||
+    libraryPublic !== ((profile.library_visibility || 'PUBLIC') === 'PUBLIC');
 
   const handleSave = async (e) => {
     e.preventDefault();
     setSaving(true);
     setSuccessMsg(null);
     setErrorMsg(null);
-
     try {
       await updateMyProfile({
         display_name: displayName.trim() || null,
         bio: bio.trim() || null,
-        profile_visibility: profileVisibility,
-        library_visibility: libraryVisibility
+        avatar_url: avatarUrl.trim() || null,
+        profile_visibility: profilePublic ? 'PUBLIC' : 'PRIVATE',
+        library_visibility: libraryPublic ? 'PUBLIC' : 'PRIVATE'
       });
-
       await refreshProfile();
-      setSuccessMsg('Settings updated successfully!');
-      setTimeout(() => setSuccessMsg(null), 4000);
+      setSuccessMsg('Your settings have been saved.');
     } catch (err) {
-      setErrorMsg(err.response?.data?.error?.message || err.message || 'Failed to update settings.');
+      const apiError = err.response?.data?.error;
+      const detail = Array.isArray(apiError?.details) ? apiError.details[0]?.message : null;
+      setErrorMsg(detail || apiError?.message || err.message || 'Failed to update settings.');
     } finally {
       setSaving(false);
     }
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } finally {
+      navigate('/', { replace: true });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-[#F3F4F6] flex flex-col font-sans selection:bg-red-500 selection:text-white">
-      {/* Top Navbar */}
-      <header className="border-b border-[#2A3245] bg-[#151922]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Link
-              to="/dashboard"
-              className="w-9 h-9 rounded-xl bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] flex items-center justify-center text-white transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Link>
+    <form onSubmit={handleSave} className="space-y-6" noValidate>
+      <Reveal>
+        <Card>
+          <h2 className="text-base font-semibold text-fg">Profile information</h2>
+          <p className="mt-1 text-sm text-fg-muted">This is how you appear on your public profile.</p>
+
+          <div className="mt-5 flex items-center gap-4">
+            <Avatar src={avatarUrl.trim() || null} name={displayName || profile.username} size="lg" />
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-fg">{displayName.trim() || `@${profile.username}`}</p>
+              <p className="text-xs text-fg-subtle">@{profile.username}</p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-5">
             <div>
-              <h1 className="text-lg font-bold text-white tracking-tight">Profile & Privacy Settings</h1>
-              <p className="text-xs text-[#9CA3AF]">Manage your public details and privacy controls</p>
+              <label htmlFor="displayName" className="mb-1.5 block text-sm font-medium text-fg">
+                Display name
+              </label>
+              <input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={80} className={fieldClass} placeholder="Your name" />
+            </div>
+            <div>
+              <label htmlFor="avatarUrl" className="mb-1.5 block text-sm font-medium text-fg">
+                Avatar image URL
+              </label>
+              <input id="avatarUrl" type="url" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} className={fieldClass} placeholder="https://…" />
+              <p className="mt-1 text-xs text-fg-subtle">A link to an image. Leave empty to use your initial.</p>
+            </div>
+            <div>
+              <label htmlFor="bio" className="mb-1.5 block text-sm font-medium text-fg">
+                Bio
+              </label>
+              <textarea id="bio" value={bio} onChange={(e) => setBio(e.target.value)} maxLength={300} rows={3} className={`${fieldClass} resize-y`} placeholder="Tell people what you love to watch." />
+              <p className="mt-1 text-right text-xs tabular-nums text-fg-subtle">{bio.length} / 300</p>
             </div>
           </div>
+        </Card>
+      </Reveal>
 
-          <div className="flex items-center space-x-2">
-            <span className="text-xs font-mono text-[#9CA3AF]">@{profile?.username}</span>
+      <Reveal delay={0.06}>
+        <Card>
+          <h2 className="text-base font-semibold text-fg">Privacy</h2>
+          <p className="mt-1 text-sm text-fg-muted">Two independent switches. You decide what the world can see.</p>
+
+          <div className="mt-5 space-y-3">
+            <PrivacyRow
+              id="profile-vis"
+              icon={profilePublic ? Globe : EyeOff}
+              title="Profile visibility"
+              description="When private, no one can view your profile page."
+              checked={profilePublic}
+              onChange={setProfilePublic}
+            />
+            <PrivacyRow
+              id="library-vis"
+              icon={profilePublic && libraryPublic ? LibraryIcon : Lock}
+              title="Library visibility"
+              description="When private, visitors to your public profile cannot see your saved titles, watched episodes, or statistics. Personal notes are always private."
+              checked={libraryPublic}
+              onChange={setLibraryPublic}
+            />
           </div>
+
+          <div className="mt-5">
+            <PrivacyPreview profilePublic={profilePublic} libraryPublic={libraryPublic} username={profile.username} />
+          </div>
+        </Card>
+      </Reveal>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div aria-live="polite" className="min-h-[1.5rem] text-sm">
+          {successMsg && (
+            <span className="inline-flex items-center gap-1.5 text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> {successMsg}
+            </span>
+          )}
+          {errorMsg && (
+            <span role="alert" className="text-[#ff9b9b]">
+              {errorMsg}
+            </span>
+          )}
+          {!successMsg && !errorMsg && dirty && <span className="text-fg-subtle">You have unsaved changes.</span>}
         </div>
-      </header>
+        <Button type="submit" variant="primary" leftIcon={Save} loading={saving} disabled={!dirty}>
+          Save changes
+        </Button>
+      </div>
 
-      {/* Main Form */}
-      <main className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-8 space-y-6">
-        
-        {successMsg && (
-          <div className="p-4 bg-emerald-950/30 border border-emerald-800/50 rounded-2xl flex items-center space-x-3 text-xs text-emerald-300">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-            <span className="font-semibold">{successMsg}</span>
-          </div>
-        )}
+      <Reveal delay={0.1}>
+        <Card>
+          <h2 className="text-base font-semibold text-fg">Account</h2>
+          <p className="mt-1 text-sm text-fg-muted">Sign out of ShowTracker on this device.</p>
+          <Button type="button" variant="destructive" leftIcon={LogOut} onClick={handleSignOut} className="mt-4">
+            Sign out
+          </Button>
+        </Card>
+      </Reveal>
+    </form>
+  );
+}
 
-        {errorMsg && (
-          <div className="p-4 bg-red-950/30 border border-red-800/50 rounded-2xl flex items-center space-x-3 text-xs text-red-300">
-            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-            <span>{errorMsg}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleSave} className="space-y-6">
-          
-          {/* Identity Section */}
-          <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-4">
-            <h2 className="text-sm font-bold text-white uppercase tracking-wider">Public Profile Details</h2>
-
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#F3F4F6]">Display Name</label>
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your display name"
-                  maxLength={80}
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#0B0E14] border border-[#2A3245] rounded-xl text-white placeholder-[#9CA3AF]/40 focus:outline-none focus:border-red-500 transition-colors"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-[#F3F4F6]">Bio</label>
-                <textarea
-                  rows={3}
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  placeholder="Tell others what you love to watch..."
-                  maxLength={300}
-                  className="w-full px-3.5 py-2.5 text-xs bg-[#0B0E14] border border-[#2A3245] rounded-xl text-white placeholder-[#9CA3AF]/40 focus:outline-none focus:border-red-500 transition-colors resize-none"
-                />
-                <p className="text-[10px] text-[#9CA3AF] text-right">{bio.length} / 300 characters</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Privacy Settings Section */}
-          <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>Privacy & Visibility Controls</span>
-              </h2>
-            </div>
-            <p className="text-xs text-[#9CA3AF]">
-              ShowTracker treats profile and library visibility independently. You can share your profile page while keeping your watchlists private.
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              
-              {/* Profile Visibility */}
-              <div className="p-4 rounded-xl bg-[#1C2230] border border-[#2A3245] space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center space-x-1.5">
-                    {profileVisibility === 'PUBLIC' ? <Globe className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
-                    <span>Profile Visibility</span>
-                  </span>
-                  <select
-                    value={profileVisibility}
-                    onChange={(e) => setProfileVisibility(e.target.value)}
-                    className="text-xs bg-[#0B0E14] border border-[#2A3245] rounded-lg px-2.5 py-1 text-white font-mono focus:outline-none focus:border-red-500"
-                  >
-                    <option value="PUBLIC">PUBLIC</option>
-                    <option value="PRIVATE">PRIVATE</option>
-                  </select>
-                </div>
-                <p className="text-[11px] text-[#9CA3AF] leading-relaxed">
-                  When set to <strong>PRIVATE</strong>, visiting /u/{profile?.username} will return 404 to any outside visitor.
-                </p>
-              </div>
-
-              {/* Library Visibility */}
-              <div className="p-4 rounded-xl bg-[#1C2230] border border-[#2A3245] space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white flex items-center space-x-1.5">
-                    {libraryVisibility === 'PUBLIC' ? <Globe className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
-                    <span>Library Visibility</span>
-                  </span>
-                  <select
-                    value={libraryVisibility}
-                    onChange={(e) => setLibraryVisibility(e.target.value)}
-                    className="text-xs bg-[#0B0E14] border border-[#2A3245] rounded-lg px-2.5 py-1 text-white font-mono focus:outline-none focus:border-red-500"
-                  >
-                    <option value="PUBLIC">PUBLIC</option>
-                    <option value="PRIVATE">PRIVATE</option>
-                  </select>
-                </div>
-                <p className="text-[11px] text-[#9CA3AF] leading-relaxed">
-                  When set to <strong>PRIVATE</strong>, your watched episodes, ratings, and private notes will never leak to public APIs.
-                </p>
-              </div>
-
-            </div>
-          </div>
-
-          {/* Save Button */}
-          <div className="flex justify-end pt-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-xs shadow-lg shadow-red-900/30 transition-all disabled:opacity-50"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-white" />
-                  <span>Saving...</span>
-                </>
-              ) : (
-                <>
-                  <Save className="w-4 h-4" />
-                  <span>Save Changes</span>
-                </>
-              )}
-            </button>
-          </div>
-
-        </form>
-
-      </main>
-    </div>
+export default function Settings() {
+  const { profile } = useAuth();
+  return (
+    <Container className="max-w-3xl py-8 sm:py-10">
+      <PageHeader
+        icon={SettingsIcon}
+        title="Settings & privacy"
+        breadcrumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Settings' }]}
+        description="Manage your profile and decide who can see it."
+      />
+      {profile ? <SettingsForm key={profile.id} profile={profile} /> : null}
+    </Container>
   );
 }

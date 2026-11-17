@@ -30,7 +30,10 @@ Discover anime, movies and TV shows from one cinematic interface, powered by rea
 | 🗂️ **Shared media catalog** stored in PostgreSQL as titles are opened | ✅ Done |
 | 📚 **Personal library**: watch status, ratings, favorites, private notes | ✅ Done |
 | ✅ **Episode tracking** for anime and TV (seasons, per-episode and per-season, auto status) | ✅ Done |
-| 🌐 Public library sharing, followers, social features | 🛠️ Planned (Phase 5+) |
+| 📊 **Live statistics** (titles, episodes watched, completions, average rating), *Continue watching* and *Recently updated* shelves | ✅ Done |
+| 🔒 **Independent privacy**: profile and library visibility are separate switches; notes are never public | ✅ Done |
+| 🎬 **Cinematic Editorial Premium UI**: design system, motion, responsive shell and mobile dock | ✅ Done |
+| 🌐 Followers, social feeds, recommendations | 🛠️ Planned (later phases) |
 
 ---
 
@@ -38,7 +41,7 @@ Discover anime, movies and TV shows from one cinematic interface, powered by rea
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | React 19, Vite, JavaScript (ESM), Tailwind CSS v3, React Router v7, Axios, Lucide |
+| **Frontend** | React 19, Vite, JavaScript (ESM), Tailwind CSS v3, React Router v7, Axios, Lucide, Motion |
 | **Backend** | Node.js 22, Express (ESM), Zod, Helmet, CORS, Morgan |
 | **Database** | Supabase PostgreSQL via `pg.Pool` (parameterized SQL, no ORM) |
 | **Auth** | Supabase Auth (Google OAuth) verified server-side |
@@ -213,11 +216,28 @@ Send `Authorization: Bearer <supabase access token>`. All data is private (`Cach
 | `POST` / `DELETE /api/library/:id/episodes/:episodeId/watched` | Mark an episode watched / unwatched |
 | `POST /api/library/:id/seasons/:seasonId/watched` | Mark a whole season watched |
 
+| `GET /api/library/stats` | Live statistics: `totalItems`, `byType`, `byStatus`, `episodesWatched`, `averageRating`, `completed`, `watching` |
+| `GET /api/library/continue-watching` | Up to 10 `WATCHING` titles, most recently updated first (with artwork and progress) |
+| `GET /api/library/recently-updated` | The 10 most recently updated titles of any status |
+
 `mediaId` is the `catalogId` returned by the details endpoint. Rules enforced by the API: movies never get episode progress (`CANNOT_TRACK_EPISODES_FOR_MOVIE`), an episode must belong to the entry's own title (`INVALID_EPISODE_FOR_MEDIA`), counts are always derived with `COUNT(*)`, and specials (season 0) don't count toward progress. Status moves automatically: first watched episode makes *Plan to Watch* become *Watching*; finishing every regular episode makes it *Completed*; un-watching one reverts it to *Watching*.
 
 TMDB supplies real seasons and episodes. AniList has no per-episode data, so anime gets `Season 1` with `Episode 1..N` generated from its episode count (or the episodes already aired for a running show).
 
-Account endpoints: `GET /api/auth/me`, `PATCH /api/profiles/me`, `GET /api/profiles/username-availability`, `GET /api/users/:username`.
+Account endpoints: `GET /api/auth/me`, `PATCH /api/profiles/me` (display name, bio, avatar URL, `profile_visibility`, `library_visibility`), `GET /api/profiles/username-availability`.
+
+### Public profiles and privacy
+
+`GET /api/users/:username` (optional sign-in) returns `{ profile, library, stats, library_is_private, isOwner }`. What the caller gets depends on the profile's two **independent** switches:
+
+| Situation | Response |
+|---|---|
+| Profile **private**, caller is not the owner | `404` (indistinguishable from an unknown username) |
+| Profile public, library **private**, not the owner | identity only: `library: []`, `stats: null`, `library_is_private: true` |
+| Profile public, library public, not the owner | identity + library + statistics, **never notes** |
+| Caller is the owner | everything, including private notes, whatever the switches say |
+
+Enforcement is layered: the `profiles` RLS policy hides private profiles; visitors read libraries **only** through the `public_library_entries` view (migration 005), which contains just public/public users and has no `notes` column at all, so notes cannot be selected through it; and the response is built from an explicit field list.
 
 ### Caching & rate limits
 
@@ -235,6 +255,7 @@ AniList documents 90 requests/minute (currently degraded to 30). The adapter rea
 | [`002_create_media_catalog.sql`](supabase/migrations/002_create_media_catalog.sql) | `media_items`, `media_sources`, `genres`, `media_genres` |
 | [`003_create_seasons_and_episodes.sql`](supabase/migrations/003_create_seasons_and_episodes.sql) | `seasons`, `episodes` (shared catalog) |
 | [`004_create_user_library_and_progress.sql`](supabase/migrations/004_create_user_library_and_progress.sql) | `user_library`, `user_episode_progress` (per-user, RLS forced) |
+| [`005_create_public_library_view.sql`](supabase/migrations/005_create_public_library_view.sql) | `public_library_entries` view: the only way visitors read a library (no `notes` column) |
 
 ```mermaid
 erDiagram
@@ -255,11 +276,27 @@ The catalog (including seasons and episodes) is **shared** data: one row per tit
 
 ---
 
+## 🎨 Design system
+
+**Cinematic Editorial Premium**: deep charcoal surfaces, warm off-white text, one restrained copper accent, crisp hairline borders, real artwork only (never invented), purposeful motion.
+
+| Token | Value |
+|---|---|
+| Page / surface / raised | `#0B0E14` / `#12161F` / `#181F2B` (`ink-base`, `ink-surface`, `ink-raised`) |
+| Borders | `#1F2633` hairlines, `#2A3245` components (`ink-line`, `ink-edge`) |
+| Text | `#F3F4F6` primary, `#9CA3AF` muted, `#6B7280` subtle (`fg`, `fg-muted`, `fg-subtle`) |
+| Accent | copper `#E07A5F` (primary actions), amber `#F59E0B` (ratings), vermilion `#E50914` (destructive only) |
+| Type | Inter, confident weights, tight tracking on headings |
+
+Reusable primitives live in `client/src/components/ui/`: `Button` (primary / secondary / ghost / outline / destructive, loading + icon slots), `Badge` / `StatusBadge`, `Card`, `Modal` (focus trap, ESC, scroll lock, focus restore), `Tabs` (sliding pill, arrow keys), `Switch`, `ProgressBar`, `Skeleton`, `Avatar`, `Logo` and the `Reveal` / `Stagger` motion helpers. All motion honors `prefers-reduced-motion` (app-wide `MotionConfig`), and routes are code-split so the first load stays small.
+
+**Application frame:** one shared shell (sticky header with user menu on desktop, bottom dock on phones, footer with TMDB attribution) wraps every page except sign-in callback, onboarding and diagnostics.
+
 ## 🧪 Testing
 
 ```bash
 cd server
-npm test            # API tests + mocked media tests + library integration tests (needs the database; ~2-3 min)
+npm test            # API + mocked media tests + library and stats/privacy integration tests (needs the database; ~6 min)
 npm run test:db     # real-database checks for migration 002 (constraints, grants, upserts)
 npm run test:live   # REAL AniList and TMDB calls + catalog persistence (TMDB needs a token)
 
@@ -268,7 +305,7 @@ npm run build       # production build
 npm run lint
 ```
 
-`test/library.test.js` runs the real routes, SQL and Row Level Security as the `showtracker_app` role with two disposable users (authentication and provider HTTP are substituted; the users and test titles are deleted afterwards).
+`test/library.test.js` and `test/stats-privacy.test.js` run the real routes, SQL and Row Level Security as the `showtracker_app` role with two disposable users (authentication and provider HTTP are substituted; the users and test titles are deleted afterwards).
 
 Mocked tests prove our logic; `test:live` proves the providers actually respond as expected. They are reported separately on purpose.
 
@@ -312,5 +349,5 @@ Movie and TV data, posters and ratings come from [TMDB](https://www.themoviedb.o
 ---
 
 <div align="center">
-<sub>Built with React, Express and PostgreSQL · Phase 4 complete</sub>
+<sub>Built with React, Express and PostgreSQL · Phase 5 complete</sub>
 </div>

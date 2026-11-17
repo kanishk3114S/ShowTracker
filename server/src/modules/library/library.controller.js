@@ -1,6 +1,7 @@
 import { AppError } from '../../middleware/errorHandler.js';
 import { withUserTransaction } from '../../db/withUserTransaction.js';
 import * as service from './library.service.js';
+import { getOwnerStats } from './library.stats.js';
 import {
   addLibrarySchema,
   updateLibrarySchema,
@@ -66,3 +67,22 @@ export const markSeason = handler((client, req) => {
   const { id, seasonId } = parse(seasonParamsSchema, req.params);
   return service.markSeasonWatched(client, req.user.id, id, seasonId);
 });
+
+// ------------------------------------------------ dashboard data (private) --
+
+const SHELF_SIZE = 10;
+
+export const stats = handler((client, req) => getOwnerStats(client, req.user.id));
+
+export const continueWatching = handler((client, req) =>
+  service.listLibrary(client, req.user.id, {
+    status: 'WATCHING',
+    sort: 'updated_at',
+    order: 'desc',
+    limit: SHELF_SIZE
+  })
+);
+
+export const recentlyUpdated = handler((client, req) =>
+  service.listLibrary(client, req.user.id, { sort: 'updated_at', order: 'desc', limit: SHELF_SIZE })
+);

@@ -1302,3 +1302,16 @@ ShowTracker's first successful release is not measured by the number of pages or
 **Rules:** progress counts are derived (`COUNT(*)`), never stored; specials (season 0) do not count toward progress or completion; episode sync never deletes episodes; all data is private to its owner via forced RLS.
 
 **Known limits:** AniList has no per-episode data, so anime episodes are generated (`Episode N`) from the episode count or aired count; a show whose episode count AniList has not published yet has no episode list until it does. Public sharing of libraries, statistics and social features remain out of scope (Phase 5+).
+
+
+---
+
+## Phase 5 (Implemented): Statistics, Privacy and the Cinematic UI
+
+**Backend:** live statistics (`/api/library/stats`), *Continue watching* and *Recently updated* shelves, a privacy-safe public profile API (`/api/users/:username`) and migration 005 (`public_library_entries` view). Profile and library visibility are independent; private profiles are a 404 for everyone but their owner; a private library returns no titles, progress or statistics; notes never appear in any public response. Multi-genre filtering (`genre=Action,Comedy`, match any) was added to search.
+
+**Frontend:** a full redesign into a "Cinematic Editorial Premium" system: design tokens and reusable primitives, an application shell (header with user menu, mobile bottom dock, footer), motion that respects reduced-motion, and redesigned landing, sign-in (split-screen modal and page), onboarding with live preview, dashboard (live stats, continue watching, recently updated, trending strip), explore (multi-genre chips), trending (editorial #1 banner), media details (cinematic hero, tracking panel with notes and removal dialogs, optimistic episode tracker), library (live count tabs), public profile (three privacy modes + owner view) and settings (independent privacy switches with a "what strangers see" preview).
+
+**Decisions:** a private profile and an unknown username return the same 404 (no enumeration); the avatar must be an http(s) URL; specials still do not count toward progress; stats count every watched episode.
+
+**Still out of scope:** followers, social feeds, recommendations, Redis, native mobile apps.

@@ -22,7 +22,7 @@ const SORTS = {
 const ENTRY_SELECT = `
   SELECT ul.id, ul.media_id, ul.status, ul.rating, ul.is_favorite, ul.notes,
          ul.started_at, ul.completed_at, ul.rewatch_count, ul.created_at, ul.updated_at,
-         mi.title, mi.poster_path, mi.media_type, mi.release_date, mi.source_rating,
+         mi.title, mi.poster_path, mi.backdrop_path, mi.media_type, mi.release_date, mi.source_rating,
          src.provider, src.external_id,
          COALESCE(w.cnt, 0)::int AS watched_episodes_count,
          COALESCE(NULLIF(t.cnt, 0)::int, (mi.metadata->>'totalEpisodes')::int) AS total_episodes
@@ -69,6 +69,7 @@ export function mapEntry(row) {
       id: row.media_id,
       title: row.title,
       posterUrl: row.poster_path,
+      backdropUrl: row.backdrop_path ?? null,
       mediaType: row.media_type,
       provider: row.provider ?? null,
       externalId: row.external_id ?? null,
@@ -89,7 +90,7 @@ async function fetchEntry(client, userId, entryId) {
   return mapEntry(rows[0]);
 }
 
-export async function listLibrary(client, userId, { status, mediaType, sort, order }) {
+export async function listLibrary(client, userId, { status, mediaType, sort, order, limit = 500 }) {
   const where = ['ul.user_id = $1'];
   const params = [userId];
   if (status) {
@@ -104,7 +105,7 @@ export async function listLibrary(client, userId, { status, mediaType, sort, ord
   const orderBy = `${SORTS[sort] ?? SORTS.updated_at} ${direction} NULLS LAST, ul.updated_at DESC`;
 
   const { rows } = await client.query(
-    `${ENTRY_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${orderBy} LIMIT 500`,
+    `${ENTRY_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${orderBy} LIMIT ${Math.min(Math.max(Number(limit) || 500, 1), 500)}`,
     params
   );
   return rows.map(mapEntry);

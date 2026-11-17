@@ -1,148 +1,192 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useMemo } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { CalendarDays, Eye, Library as LibraryIcon, Lock, Settings as SettingsIcon } from 'lucide-react';
+import Container from '../../components/layout/Container';
+import Avatar from '../../components/ui/Avatar';
+import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
+import { Skeleton, PosterGridSkeleton, POSTER_GRID } from '../../components/ui/Skeleton';
+import { Reveal, Stagger, StaggerItem } from '../../components/ui/motion';
+import PublicLibraryCard from '../../components/library/PublicLibraryCard';
+import LibraryFilters, { SORTS } from '../../components/library/LibraryFilters';
+import StatCard from '../../components/dashboard/StatCard';
+import EmptyState from '../../components/media/EmptyState';
+import ProviderErrorState from '../../components/media/ProviderErrorState';
+import { STATUS_ORDER } from '../../components/library/libraryConstants';
 import { getPublicProfile } from '../../services/api';
-import { 
-  Film, 
-  User, 
-  ArrowLeft, 
-  Calendar, 
-  Lock, 
-  Globe, 
-  Loader2, 
-  AlertCircle,
-  ExternalLink
-} from 'lucide-react';
+import { useApiResource } from '../../hooks/useApiResource';
+
+const joined = (iso) => new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
+
+function ProfileSkeleton() {
+  return (
+    <Container className="py-8">
+      <div role="status" aria-label="Loading profile" className="space-y-8">
+        <Skeleton className="h-40 rounded-2xl" />
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {Array.from({ length: 4 }, (_, i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
+        <PosterGridSkeleton count={6} />
+      </div>
+    </Container>
+  );
+}
 
 export default function PublicProfile() {
   const { username } = useParams();
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [params, setParams] = useSearchParams();
+  const status = STATUS_ORDER.includes(params.get('status')) ? params.get('status') : '';
+  const mediaType = ['ANIME', 'MOVIE', 'TV'].includes(params.get('type')) ? params.get('type') : '';
+  const sortKey = SORTS[params.get('sort')] ? params.get('sort') : 'recent';
+  const { sort, order } = SORTS[sortKey];
 
-  useEffect(() => {
-    async function fetchPublicProfile() {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await getPublicProfile(username);
-        if (data?.success && data?.profile) {
-          setProfile(data.profile);
-        } else {
-          setError('Profile not found.');
-        }
-      } catch (err) {
-        setError(err.response?.data?.error?.message || 'User not found or profile is private.');
-      } finally {
-        setLoading(false);
-      }
-    }
+  const update = (changes) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        Object.entries(changes).forEach(([k, v]) => (v ? next.set(k, v) : next.delete(k)));
+        return next;
+      },
+      { replace: true }
+    );
 
-    if (username) {
-      fetchPublicProfile();
-    }
-  }, [username]);
+  const { data, error, loading, reload } = useApiResource(
+    (signal) => getPublicProfile(username, { status, mediaType, sort, order }, signal),
+    [username, status, mediaType, sort, order]
+  );
+
+  const counts = useMemo(() => (data?.stats ? { total: data.stats.totalItems, byStatus: data.stats.byStatus } : null), [data]);
+
+  if (loading && !data) return <ProfileSkeleton />;
+
+  // Mode 1: private (or unknown) profile. The server answers 404 for both so nothing is revealed.
+  if (error?.status === 404 || error?.code === 'USER_NOT_FOUND') {
+    return (
+      <Container className="max-w-2xl py-20">
+        <Reveal>
+          <EmptyState
+            icon={Lock}
+            title="This profile is private"
+            message="This profile isn't available. It is either private, or no one uses that username."
+            action={
+              <Button as={Link} to="/explore" variant="secondary">
+                Explore titles
+              </Button>
+            }
+          />
+        </Reveal>
+      </Container>
+    );
+  }
+  if (error && !data) {
+    return (
+      <Container className="max-w-2xl py-20">
+        <ProviderErrorState error={error} onRetry={reload} />
+      </Container>
+    );
+  }
+  if (!data) return null;
+
+  const { profile, library, stats, library_is_private: libraryPrivate, isOwner } = data;
+  const name = profile.display_name || `@${profile.username}`;
+  const entries = library ?? [];
+  const showLibrary = isOwner || !libraryPrivate;
 
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-[#F3F4F6] flex flex-col font-sans selection:bg-red-500 selection:text-white">
-      {/* Top Navbar */}
-      <header className="border-b border-[#2A3245] bg-[#151922]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center space-x-2 text-xs font-semibold text-[#9CA3AF] hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back to Dashboard</span>
-          </Link>
-
-          <div className="flex items-center space-x-2">
-            <Film className="w-5 h-5 text-red-500" />
-            <span className="text-sm font-bold tracking-tight text-white">ShowTracker</span>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-4xl w-full mx-auto p-6 md:p-8 flex flex-col items-center justify-center">
-        
-        {loading ? (
-          <div className="flex flex-col items-center space-y-3">
-            <Loader2 className="w-6 h-6 animate-spin text-red-500" />
-            <p className="text-xs text-[#9CA3AF]">Loading profile...</p>
-          </div>
-        ) : error ? (
-          <div className="bg-[#151922] border border-[#2A3245] rounded-3xl p-8 max-w-md w-full text-center space-y-4 shadow-xl">
-            <div className="w-12 h-12 rounded-2xl bg-amber-950/50 border border-amber-800/50 flex items-center justify-center mx-auto text-amber-400">
-              <Lock className="w-6 h-6" />
-            </div>
-            <h2 className="text-lg font-bold text-white">Profile Unavailable</h2>
-            <p className="text-xs text-[#9CA3AF] leading-relaxed">
-              {error}
-            </p>
-            <Link
-              to="/dashboard"
-              className="inline-flex items-center justify-center space-x-2 px-4 py-2.5 rounded-xl bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-xs font-semibold text-white transition-colors"
-            >
-              <span>Return to Dashboard</span>
-            </Link>
-          </div>
-        ) : profile ? (
-          <div className="bg-[#151922] border border-[#2A3245] rounded-3xl p-8 max-w-2xl w-full space-y-6 shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-red-600/5 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="flex flex-col sm:flex-row items-center sm:items-start space-y-4 sm:space-y-0 sm:space-x-6 text-center sm:text-left">
-              {profile.avatar_url ? (
-                <img
-                  src={profile.avatar_url}
-                  alt={profile.display_name}
-                  className="w-24 h-24 rounded-2xl object-cover border-2 border-red-500/50 shadow-lg"
-                />
-              ) : (
-                <div className="w-24 h-24 rounded-2xl bg-[#2A3245] flex items-center justify-center text-[#9CA3AF]">
-                  <User className="w-12 h-12" />
+    <div>
+      {/* Header */}
+      <div className="relative border-b border-ink-line bg-ink-surface">
+        <div className="h-32 bg-gradient-to-br from-copper/25 via-ink-raised to-ink-surface sm:h-44" aria-hidden="true" />
+        <Container>
+          <div className="-mt-12 flex flex-col gap-5 pb-8 sm:-mt-14 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+              <Avatar src={profile.avatar_url} name={name} size="xl" className="!h-24 !w-24 border-4 border-ink-surface sm:!h-28 sm:!w-28" />
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="truncate text-3xl font-extrabold tracking-tight text-fg">{name}</h1>
+                  {isOwner && (
+                    <Badge tone="copper">
+                      <Eye className="h-3 w-3" aria-hidden="true" /> Owner view
+                    </Badge>
+                  )}
                 </div>
-              )}
-
-              <div className="space-y-2 flex-1">
-                <div>
-                  <h1 className="text-2xl font-bold text-white tracking-tight">
-                    {profile.display_name || profile.username}
-                  </h1>
-                  <p className="text-xs font-mono text-red-400">@{profile.username}</p>
-                </div>
-
-                <p className="text-xs text-[#9CA3AF] leading-relaxed">
-                  {profile.bio || 'This user has not written a bio yet.'}
+                <p className="text-sm text-fg-muted">@{profile.username}</p>
+                {profile.bio && <p className="mt-3 max-w-2xl whitespace-pre-line text-sm leading-relaxed text-fg/90">{profile.bio}</p>}
+                <p className="mt-3 inline-flex items-center gap-1.5 text-xs text-fg-subtle">
+                  <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" /> Joined {joined(profile.created_at)}
                 </p>
-
-                <div className="flex items-center justify-center sm:justify-start space-x-4 text-xs text-[#9CA3AF] pt-2">
-                  <span className="flex items-center space-x-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    <span>Member since {new Date(profile.created_at).toLocaleDateString()}</span>
-                  </span>
-                  <span className="flex items-center space-x-1 text-emerald-400">
-                    <Globe className="w-3.5 h-3.5" />
-                    <span>Public Profile</span>
-                  </span>
-                </div>
               </div>
             </div>
-
-            {profile.isOwner && (
-              <div className="p-3.5 bg-red-950/20 border border-red-800/40 rounded-xl flex items-center justify-between text-xs text-red-300">
-                <span>You are viewing your own public profile.</span>
-                <Link
-                  to="/settings"
-                  className="font-semibold underline hover:text-white"
-                >
-                  Edit in Settings
-                </Link>
-              </div>
+            {isOwner && (
+              <Button as={Link} to="/settings" variant="secondary" size="sm" leftIcon={SettingsIcon}>
+                Edit profile &amp; privacy
+              </Button>
             )}
           </div>
-        ) : null}
+        </Container>
+      </div>
 
-      </main>
+      <Container className="py-10">
+        {isOwner && libraryPrivate && (
+          <p className="mb-6 flex items-start gap-2 rounded-xl border border-copper/30 bg-copper/5 px-4 py-3 text-sm text-fg-muted">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0 text-copper" aria-hidden="true" />
+            Your library is private. Visitors see only your profile details. Private notes are never shown to anyone but you.
+          </p>
+        )}
+
+        {/* Mode 2: public profile, private library */}
+        {!showLibrary && (
+          <Reveal>
+            <EmptyState
+              icon={Lock}
+              title="This user's library is private"
+              message={`@${profile.username} has chosen not to share their saved titles, progress or statistics.`}
+            />
+          </Reveal>
+        )}
+
+        {/* Mode 3 and owner view: stats + library */}
+        {showLibrary && stats && (
+          <>
+            <Stagger className="mb-10 grid grid-cols-2 gap-4 lg:grid-cols-4" gap={0.06}>
+              <StatCard label="Titles" value={stats.totalItems} icon={LibraryIcon} hint="in library" />
+              <StatCard label="Completed" value={stats.completed} hint="finished titles" />
+              <StatCard label="Episodes watched" value={stats.episodesWatched.toLocaleString()} hint="across anime and TV" />
+              <StatCard label="Average rating" value={stats.averageRating === null ? '—' : stats.averageRating.toFixed(1)} hint={stats.ratedCount > 0 ? `from ${stats.ratedCount} rated` : 'no ratings yet'} />
+            </Stagger>
+
+            <LibraryFilters
+              idPrefix="profile"
+              status={status}
+              mediaType={mediaType}
+              sortKey={sortKey}
+              counts={counts}
+              onChange={(changes) => update(changes)}
+            />
+
+            <div className="mt-8">
+              {entries.length === 0 ? (
+                <EmptyState
+                  icon={LibraryIcon}
+                  title={status || mediaType ? 'No titles match' : 'Nothing here yet'}
+                  message={status || mediaType ? 'Try another filter.' : `@${profile.username} hasn't added any titles yet.`}
+                />
+              ) : (
+                <Stagger key={`${status}|${mediaType}|${sortKey}`} className={`${POSTER_GRID} transition-opacity ${loading ? 'opacity-50' : ''}`} gap={0.03}>
+                  {entries.map((entry) => (
+                    <StaggerItem key={entry.id}>
+                      <PublicLibraryCard entry={entry} />
+                    </StaggerItem>
+                  ))}
+                </Stagger>
+              )}
+            </div>
+          </>
+        )}
+      </Container>
     </div>
   );
 }
+

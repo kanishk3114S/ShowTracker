@@ -436,3 +436,46 @@ LEFT JOIN user_episode_progress uep
 WHERE s.media_id = '<media uuid>'
 ORDER BY s.season_number, e.episode_number;
 ```
+
+
+---
+
+## Phase 5: Public library view and privacy (migration `005_create_public_library_view.sql`)
+
+### The problem it solves
+
+`user_library` and `user_episode_progress` are **owner-only** under Row Level Security: nobody but the owner can read those rows. That is right for private data, but a public profile needs to show *some* of it to visitors. Loosening the policies would also expose the private `notes` column (RLS works on whole rows, not columns).
+
+### The solution: a view
+
+A **view** is a saved query you read like a table. `public.public_library_entries`:
+
+- returns only rows whose owner has **both** `profile_visibility = 'PUBLIC'` and `library_visibility = 'PUBLIC'`
+- selects only safe columns, and has **no `notes` column at all**, so no query against it can ever return notes
+- also provides the derived numbers (watched count, total episodes, all-time episodes watched)
+- runs with its owner's privileges (the admin role that ran the migration), which is what allows it to read across users; the visibility conditions live inside the view definition
+- is readable only by the backend role (`anon` and `authenticated` are revoked)
+
+```mermaid
+flowchart LR
+    O[Owner] -->|"RLS: own rows only, with notes"| L[(user_library)]
+    V[Visitor] -->|"safe columns, PUBLIC + PUBLIC only"| W[[public_library_entries view]]
+    W --> L
+```
+
+### Statistics are never stored
+
+All statistics (totals by type and status, episodes watched, average rating) are computed with `COUNT` / `AVG` on every request. The same aggregate SQL runs against either the owner's rows (under RLS) or the public view, so the owner and a visitor always see identical numbers for a public library.
+
+```sql
+-- Library breakdown for one user (what GET /api/library/stats does, simplified)
+SELECT mi.media_type, ul.status, COUNT(*) AS titles
+FROM user_library ul
+JOIN media_items mi ON mi.id = ul.media_id
+WHERE ul.user_id = '<user uuid>'
+GROUP BY mi.media_type, ul.status;
+
+-- Average of rated titles only
+SELECT ROUND(AVG(rating)::numeric, 1) FROM user_library
+WHERE user_id = '<user uuid>' AND rating IS NOT NULL;
+```

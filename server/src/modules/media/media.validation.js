@@ -18,12 +18,16 @@ const typeSchema = z.preprocess(
 );
 
 // Genre names are matched in application code against provider lists; never used as SQL or identifiers.
+// Accepts one name ("Action") or a comma-separated list ("Action,Comedy", max 5) meaning "any of these".
+const GENRE_NAME = /^[\p{L}\p{N} &'\-]{1,40}$/u;
 const genreSchema = optional(
   z
     .string()
     .trim()
-    .max(40)
-    .regex(/^[\p{L}\p{N} &'\-]+$/u, 'genre contains unsupported characters.')
+    .max(250)
+    .transform((value) => value.split(',').map((g) => g.trim()).filter(Boolean))
+    .refine((names) => names.length > 0 && names.length <= 5, { message: 'Choose between 1 and 5 genres.' })
+    .refine((names) => names.every((n) => GENRE_NAME.test(n)), { message: 'genre contains unsupported characters.' })
 );
 
 const yearSchema = optional(z.coerce.number().int().min(1900).max(2100));

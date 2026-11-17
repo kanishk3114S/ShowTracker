@@ -91,24 +91,24 @@ export async function searchTv({ query, page = 1, year } = {}) {
 }
 
 /** Browse (no text query): popularity-ordered discover, which supports genre and year filters. */
-export async function discoverMovies({ page = 1, genreId, year } = {}) {
+export async function discoverMovies({ page = 1, genreIds, year } = {}) {
   return toPage(
     await tmdbGet('/discover/movie', {
       page: clampPage(page),
       sort_by: 'popularity.desc',
-      with_genres: genreId,
+      with_genres: genreIds?.length ? genreIds.join('|') : undefined, // '|' = match ANY of the genres
       primary_release_year: year,
       include_adult: false
     })
   );
 }
 
-export async function discoverTv({ page = 1, genreId, year } = {}) {
+export async function discoverTv({ page = 1, genreIds, year } = {}) {
   return toPage(
     await tmdbGet('/discover/tv', {
       page: clampPage(page),
       sort_by: 'popularity.desc',
-      with_genres: genreId,
+      with_genres: genreIds?.length ? genreIds.join('|') : undefined, // '|' = match ANY of the genres
       first_air_date_year: year,
       include_adult: false
     })

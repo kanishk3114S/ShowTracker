@@ -1,173 +1,239 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import { 
-  Film, 
-  Tv, 
-  ShieldCheck, 
-  Sparkles, 
-  Activity, 
-  ArrowRight,
-  AlertCircle,
-  Loader2
-} from 'lucide-react';
+import { motion } from 'motion/react';
+import { ArrowRight, BarChart3, Check, Compass, Eye, Lock, Sparkles } from 'lucide-react';
+import Container from '../../components/layout/Container';
+import Button from '../../components/ui/Button';
+import Badge from '../../components/ui/Badge';
+import PosterImage from '../../components/media/PosterImage';
+import ProgressBar from '../../components/ui/ProgressBar';
+import { Reveal } from '../../components/ui/motion';
+import { useSignIn } from '../../components/auth/SignInContext';
+import { useTrendingArtwork } from '../../hooks/useTrendingArtwork';
+import { TYPE_LABELS } from '../../components/media/mediaUtils';
 
-export default function Landing() {
-  const { signInWithGoogle, error: authError } = useAuth();
-  const [signingIn, setSigningIn] = useState(false);
-  const [localError, setLocalError] = useState(null);
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setSigningIn(true);
-      setLocalError(null);
-      await signInWithGoogle();
-    } catch (err) {
-      setLocalError(err.message || 'Google sign-in could not be initiated.');
-      setSigningIn(false);
-    }
-  };
-
-  const displayError = localError || authError;
+/** Real trending posters in three offset columns. Renders nothing if the artwork API is unavailable. */
+function HeroCollage({ posters }) {
+  const picks = posters.slice(0, 9);
+  if (picks.length < 6) return null;
+  const columns = [picks.filter((_, i) => i % 3 === 0), picks.filter((_, i) => i % 3 === 1), picks.filter((_, i) => i % 3 === 2)];
+  const offsets = ['mt-0', 'mt-12', 'mt-4'];
+  const drift = [-10, 12, -6];
 
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-[#F3F4F6] flex flex-col font-sans selection:bg-red-500 selection:text-white">
-      {/* Navbar */}
-      <header className="border-b border-[#2A3245] bg-[#151922]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-amber-500 flex items-center justify-center shadow-lg shadow-red-900/30">
-              <Film className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-white">ShowTracker</span>
-              <p className="text-xs text-[#9CA3AF]">One account. One library. Everything you watch.</p>
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-3">
-            <Link
-              to="/health"
-              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-[#9CA3AF] hover:text-white transition-all"
-            >
-              <Activity className="w-3.5 h-3.5 text-red-400" />
-              <span>System Health</span>
-            </Link>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero Section */}
-      <main className="flex-1 max-w-5xl mx-auto w-full px-6 py-12 md:py-20 flex flex-col items-center text-center space-y-8">
-        
-        {/* Release Tag */}
-        <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-red-950/60 border border-red-800/50 text-red-400 text-xs font-semibold">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Phase 2: Google Authentication & Profile Onboarding</span>
-        </div>
-
-        {/* Main Heading */}
-        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight text-white max-w-3xl leading-tight">
-          Track Anime, Movies & TV Shows in <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-400">One Unified Library</span>
-        </h1>
-
-        {/* Subtitle */}
-        <p className="text-base md:text-lg text-[#9CA3AF] max-w-2xl leading-relaxed">
-          Stop juggling multiple tracking apps. ShowTracker links your favorite anime, films, and TV series under one profile with true privacy controls and episode-level accuracy.
-        </p>
-
-        {/* Error Alert if sign-in fails */}
-        {displayError && (
-          <div className="w-full max-w-md bg-red-950/30 border border-red-800/50 rounded-xl p-4 flex items-start space-x-3 text-left text-xs text-red-300">
-            <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <p className="font-semibold text-red-200">Authentication Error</p>
-              <p>{displayError}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Primary Action Button */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-md">
-          <button
-            onClick={handleGoogleSignIn}
-            disabled={signingIn}
-            className="w-full inline-flex items-center justify-center space-x-3 px-6 py-3.5 rounded-xl bg-white hover:bg-neutral-100 text-neutral-900 font-semibold text-sm shadow-xl hover:shadow-2xl transition-all duration-200 disabled:opacity-50"
+    <div className="relative mx-auto w-full max-w-md lg:max-w-none" aria-hidden="true">
+      <div className="absolute -inset-10 rounded-full bg-copper/10 blur-3xl" />
+      <div className="relative grid grid-cols-3 gap-3 sm:gap-4">
+        {columns.map((col, c) => (
+          <motion.div
+            key={c}
+            className={`space-y-3 sm:space-y-4 ${offsets[c]}`}
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.15 * c, ease: [0.22, 1, 0.36, 1] }}
           >
-            {signingIn ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin text-neutral-900" />
-                <span>Redirecting to Google...</span>
-              </>
-            ) : (
-              <>
-                {/* Google Icon SVG */}
-                <svg className="w-4 h-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                  />
-                </svg>
-                <span>Continue with Google</span>
-                <ArrowRight className="w-4 h-4 text-neutral-400" />
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Feature Cards Grid */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full pt-12 text-left">
-          
-          <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-red-950/70 border border-red-800/60 flex items-center justify-center text-red-400">
-              <Film className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-white text-base">Anime & Catalog</h3>
-            <p className="text-xs text-[#9CA3AF] leading-relaxed">
-              Track seasonal anime episode by episode with AniList metadata, clear airing schedules, and ratings.
-            </p>
-          </div>
-
-          <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-950/70 border border-amber-800/60 flex items-center justify-center text-amber-400">
-              <Tv className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-white text-base">Movies & TV Series</h3>
-            <p className="text-xs text-[#9CA3AF] leading-relaxed">
-              Complete TMDB catalog integration. Keep track of what you are currently watching and what to plan next.
-            </p>
-          </div>
-
-          <div className="bg-[#151922] border border-[#2A3245] rounded-2xl p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-950/70 border border-emerald-800/60 flex items-center justify-center text-emerald-400">
-              <ShieldCheck className="w-5 h-5" />
-            </div>
-            <h3 className="font-bold text-white text-base">True Privacy Controls</h3>
-            <p className="text-xs text-[#9CA3AF] leading-relaxed">
-              Share your public profile while keeping your watchlist, personal notes, and ratings completely private.
-            </p>
-          </div>
-
-        </section>
-
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-[#2A3245] bg-[#151922] py-4 px-6 text-center text-xs text-[#9CA3AF]">
-        <span>ShowTracker &bull; Personal Entertainment Tracker &bull; Phase 2</span>
-      </footer>
+            <motion.div animate={{ y: [0, drift[c], 0] }} transition={{ duration: 9 + c * 2, repeat: Infinity, ease: 'easeInOut' }} className="space-y-3 sm:space-y-4">
+              {col.map((m) => (
+                <PosterImage
+                  key={`${m.provider}:${m.externalId}`}
+                  src={m.posterUrl}
+                  alt=""
+                  className="aspect-[2/3] rounded-xl border border-ink-edge shadow-lift"
+                />
+              ))}
+            </motion.div>
+          </motion.div>
+        ))}
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-ink-base to-transparent" />
     </div>
+  );
+}
+
+function FeatureHeading({ eyebrow, title, children }) {
+  return (
+    <div className="max-w-xl">
+      <p className="text-sm font-semibold text-copper">{eyebrow}</p>
+      <h2 className="mt-2 text-3xl font-bold tracking-tight text-fg sm:text-4xl">{title}</h2>
+      <p className="mt-4 text-base leading-relaxed text-fg-muted">{children}</p>
+    </div>
+  );
+}
+
+export default function Landing() {
+  const { openSignIn } = useSignIn();
+  const { posters, groups } = useTrendingArtwork();
+  const one = (type) => (groups[type] ?? []).find((m) => m.posterUrl);
+  const trio = ['ANIME', 'TV', 'MOVIE'].map(one).filter(Boolean);
+
+  return (
+    <>
+      {/* Hero */}
+      <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_75%_30%,rgba(224,122,95,0.10),transparent)]" aria-hidden="true" />
+        <Container className="grid items-center gap-12 py-14 sm:py-20 lg:grid-cols-[1.05fr_1fr] lg:py-24">
+          <div>
+            <Reveal>
+              <Badge tone="copper" className="mb-5">
+                <Sparkles className="h-3 w-3" aria-hidden="true" /> Anime · Movies · TV in one library
+              </Badge>
+            </Reveal>
+            <Reveal delay={0.05}>
+              <h1 className="text-4xl font-extrabold leading-[1.05] tracking-tight text-fg sm:text-5xl lg:text-6xl">
+                Your watchlist.
+                <br />
+                Your stories.
+                <br />
+                <span className="text-copper">Your universe.</span>
+              </h1>
+            </Reveal>
+            <Reveal delay={0.12}>
+              <p className="mt-6 max-w-xl text-lg leading-relaxed text-fg-muted">
+                Track every anime, movie and series you love, all in one personal library.
+              </p>
+            </Reveal>
+            <Reveal delay={0.18}>
+              <div className="mt-9 flex flex-wrap gap-3">
+                <Button variant="primary" size="lg" rightIcon={ArrowRight} onClick={openSignIn}>
+                  Start tracking
+                </Button>
+                <Button as={Link} to="/explore" variant="secondary" size="lg" leftIcon={Compass}>
+                  Explore titles
+                </Button>
+              </div>
+              <p className="mt-4 text-xs text-fg-subtle">Free to use. Sign in with Google. Your notes stay private.</p>
+            </Reveal>
+          </div>
+          <Reveal delay={0.1}>
+            <HeroCollage posters={posters} />
+          </Reveal>
+        </Container>
+      </section>
+
+      {/* 1. Unified library */}
+      <section className="border-t border-ink-line py-20">
+        <Container className="grid items-center gap-12 lg:grid-cols-2">
+          <Reveal inView>
+            <FeatureHeading eyebrow="Unified entertainment library" title="Anime, shows and films, side by side.">
+              Stop juggling three apps. Anime from AniList and movies and series from TMDB live in one library, with one
+              status system, one rating scale and one place to pick up where you left off.
+            </FeatureHeading>
+          </Reveal>
+          <Reveal inView delay={0.1}>
+            {trio.length === 3 ? (
+              <div className="grid grid-cols-3 gap-4">
+                {trio.map((m, i) => (
+                  <div key={m.mediaType} className={i === 1 ? 'mt-6' : ''}>
+                    <PosterImage src={m.posterUrl} alt="" className="aspect-[2/3] rounded-xl border border-ink-edge shadow-lift" />
+                    <p className="mt-2.5 text-center text-xs font-medium text-fg-muted">{TYPE_LABELS[m.mediaType]}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-4 text-center text-sm text-fg-muted">
+                {['Anime', 'TV Shows', 'Movies'].map((t) => (
+                  <div key={t} className="flex aspect-[2/3] items-center justify-center rounded-xl border border-ink-edge bg-ink-surface">
+                    {t}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Reveal>
+        </Container>
+      </section>
+
+      {/* 2. Episode precision */}
+      <section className="border-t border-ink-line bg-ink-surface/40 py-20">
+        <Container className="grid items-center gap-12 lg:grid-cols-2">
+          <Reveal inView delay={0.1} className="order-2 lg:order-1">
+            <div className="rounded-2xl border border-ink-edge bg-ink-surface p-5 shadow-card" aria-label="Illustration of the episode tracker">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-semibold text-fg">Episode tracker</p>
+                <Badge tone="neutral">Illustration</Badge>
+              </div>
+              <ProgressBar value={3} max={5} label="Example progress" />
+              <div className="mt-4 flex gap-1.5">
+                {['Season 1', 'Season 2'].map((s, i) => (
+                  <span
+                    key={s}
+                    className={`rounded-lg border px-3 py-1 text-xs font-medium ${i === 0 ? 'border-copper/50 bg-copper/10 text-copper' : 'border-ink-edge text-fg-muted'}`}
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+              <ul className="mt-4 space-y-1.5">
+                {[true, true, true, false, false].map((done, i) => (
+                  <li
+                    key={i}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-2 ${done ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-ink-edge bg-ink-raised/50'}`}
+                  >
+                    <span className={`flex h-5 w-5 items-center justify-center rounded-md border ${done ? 'border-emerald-500 bg-emerald-500 text-ink-base' : 'border-[#3b455e]'}`}>
+                      {done && <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />}
+                    </span>
+                    <span className="text-sm text-fg-muted">Episode {i + 1}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+          <Reveal inView className="order-1 lg:order-2">
+            <FeatureHeading eyebrow="Episode-by-episode precision" title="Know exactly where you stopped.">
+              Tick off episodes one at a time or a whole season at once. Progress bars, automatic status changes and
+              season tabs keep every series up to date without any busywork.
+            </FeatureHeading>
+          </Reveal>
+        </Container>
+      </section>
+
+      {/* 3. Stats & privacy */}
+      <section className="border-t border-ink-line py-20">
+        <Container>
+          <Reveal inView>
+            <FeatureHeading eyebrow="Personal stats & privacy" title="Your numbers. Your rules.">
+              See what you have watched, how much, and how you rate it. Then decide who else gets to see any of it.
+            </FeatureHeading>
+          </Reveal>
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {[
+              { icon: BarChart3, title: 'Live statistics', text: 'Titles, episodes watched, completions and your average rating, always calculated from your real library.' },
+              { icon: Eye, title: 'Public or private profile', text: 'Share a profile page, or keep it entirely to yourself. It is one switch in settings.' },
+              { icon: Lock, title: 'Library privacy, separately', text: 'Show your profile but hide your library. Personal notes are never public, whatever you choose.' }
+            ].map((f, i) => (
+              <Reveal inView delay={0.07 * i} key={f.title}>
+                <div className="h-full rounded-2xl border border-ink-edge bg-ink-surface p-6 shadow-card">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-ink-edge bg-ink-raised">
+                    <f.icon className="h-5 w-5 text-copper" aria-hidden="true" />
+                  </span>
+                  <h3 className="mt-4 text-base font-semibold text-fg">{f.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-fg-muted">{f.text}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </Container>
+      </section>
+
+      {/* Closing CTA */}
+      <section className="border-t border-ink-line pb-4 pt-20">
+        <Container>
+          <Reveal inView>
+            <div className="relative overflow-hidden rounded-3xl border border-ink-edge bg-ink-surface px-6 py-14 text-center sm:px-12">
+              <div className="pointer-events-none absolute left-1/2 top-0 h-56 w-[36rem] -translate-x-1/2 rounded-full bg-copper/10 blur-3xl" aria-hidden="true" />
+              <h2 className="relative text-3xl font-bold tracking-tight text-fg sm:text-4xl">Ready to build your library?</h2>
+              <p className="relative mx-auto mt-3 max-w-lg text-fg-muted">Sign in once and pick up exactly where you left off, on any device.</p>
+              <div className="relative mt-8 flex flex-wrap justify-center gap-3">
+                <Button variant="primary" size="lg" rightIcon={ArrowRight} onClick={openSignIn}>
+                  Start tracking
+                </Button>
+                <Button as={Link} to="/trending" variant="secondary" size="lg">
+                  See what&rsquo;s trending
+                </Button>
+              </div>
+            </div>
+          </Reveal>
+        </Container>
+      </section>
+    </>
   );
 }

@@ -47,10 +47,10 @@ const PAGE_INFO = 'pageInfo { total currentPage lastPage hasNextPage perPage }';
 
 // Adult content is excluded from discovery on purpose (isAdult: false).
 const LIST_QUERY = `
-  query ($page: Int, $perPage: Int, $search: String, $sort: [MediaSort], $genre: String, $year: Int) {
+  query ($page: Int, $perPage: Int, $search: String, $sort: [MediaSort], $genres: [String], $year: Int) {
     Page(page: $page, perPage: $perPage) {
       ${PAGE_INFO}
-      media(type: ANIME, isAdult: false, search: $search, sort: $sort, genre: $genre, seasonYear: $year) {
+      media(type: ANIME, isAdult: false, search: $search, sort: $sort, genre_in: $genres, seasonYear: $year) {
         ${LIST_FIELDS}
       }
     }
@@ -150,12 +150,12 @@ function toPage(data) {
 }
 
 /** Search anime by title (or browse by popularity when `search` is omitted). */
-export async function searchAnime({ search, page = 1, perPage = 20, genre, year } = {}) {
+export async function searchAnime({ search, page = 1, perPage = 20, genres, year } = {}) {
   const data = await graphql(LIST_QUERY, {
     page,
     perPage,
     search: search || undefined,
-    genre: genre || undefined,
+    genres: genres?.length ? genres : undefined,
     year: year || undefined,
     sort: search ? ['SEARCH_MATCH'] : ['POPULARITY_DESC']
   });

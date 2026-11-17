@@ -12,6 +12,9 @@ export function createLibraryRouter({ auth = requireAuth } = {}) {
 
   router.get('/', c.list);
   router.post('/', c.add);
+  router.get('/stats', c.stats);
+  router.get('/continue-watching', c.continueWatching);
+  router.get('/recently-updated', c.recentlyUpdated);
   router.get('/check/:mediaId', c.check); // must stay above '/:id'
   router.patch('/:id', c.update);
   router.delete('/:id', c.remove);

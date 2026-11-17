@@ -92,31 +92,49 @@ const withNoError = (group) => ({ ...group, error: group.error ?? null });
 
 // ------------------------------------------------------------------ search --
 
+/** Genre names a provider supports for one media type (cached 24h; shared with the genres endpoint). */
+function providerGenreNames(mediaType) {
+  return cache.getOrLoad(`genres:list:${mediaType}`, TTL.genres, async () => {
+    if (mediaType === 'ANIME') return anilist.getAnimeGenres();
+    return (await tmdb.getGenres(TMDB_PATH[mediaType])).map((g) => g.name);
+  });
+}
+
+const EMPTY_PAGE = (page) => ({ page, totalPages: 0, totalResults: 0, hasNextPage: false });
+
 async function searchGroup(mediaType, { q, page, genre, year }) {
-  const key = `search:${mediaType}:${(q || '').toLowerCase()}:${page}:${(genre || '').toLowerCase()}:${year || ''}`;
+  // `genre` is an array of names ("match any"); a single string is accepted for backward compatibility.
+  const wanted = (Array.isArray(genre) ? genre : genre ? [genre] : []).map((g) => g.trim()).filter(Boolean);
+  const genreKey = wanted.map((g) => g.toLowerCase()).sort().join('|');
+  const key = `search:${mediaType}:${(q || '').toLowerCase()}:${page}:${genreKey}:${year || ''}`;
+
   return cache.getOrLoad(key, q ? TTL.search : TTL.trending, () =>
     buildGroup(mediaType, async () => {
       if (mediaType === 'ANIME') {
-        const { items, pageInfo } = await anilist.searchAnime({ search: q, page, genre, year });
+        let genres;
+        if (wanted.length > 0) {
+          // Keep only names AniList really has, so one unknown name cannot break the request.
+          const known = await providerGenreNames('ANIME');
+          genres = wanted.map((w) => known.find((k) => k.toLowerCase() === w.toLowerCase())).filter(Boolean);
+          if (genres.length === 0) return { items: [], pageInfo: EMPTY_PAGE(page) };
+        }
+        const { items, pageInfo } = await anilist.searchAnime({ search: q, page, genres, year });
         return { items: compact(items.map(normalizeAniListMedia)), pageInfo };
       }
 
       const genreMap = await getTmdbGenreMap(mediaType);
       const ignoredFilters = [];
-      let genreId;
-      if (genre) {
+      let genreIds;
+      if (wanted.length > 0) {
         if (q) {
           // TMDB's text search cannot filter by genre; say so instead of silently mis-filtering.
           ignoredFilters.push('genre');
         } else {
-          genreId = [...genreMap.entries()].find(([, name]) => name.toLowerCase() === genre.toLowerCase())?.[0];
-          if (genreId === undefined) {
-            // This provider has no such genre for this type -> honest empty result.
-            return {
-              items: [],
-              pageInfo: { page, totalPages: 0, totalResults: 0, hasNextPage: false },
-              extra: { ignoredFilters }
-            };
+          const byName = new Map([...genreMap.entries()].map(([id, name]) => [name.toLowerCase(), id]));
+          genreIds = [...new Set(wanted.map((w) => byName.get(w.toLowerCase())).filter((id) => id !== undefined))];
+          if (genreIds.length === 0) {
+            // This provider has none of the chosen genres for this type -> honest empty result.
+            return { items: [], pageInfo: EMPTY_PAGE(page), extra: { ignoredFilters } };
           }
         }
       }
@@ -125,9 +143,9 @@ async function searchGroup(mediaType, { q, page, genre, year }) {
       if (mediaType === 'MOVIE') {
         page$ = q
           ? await tmdb.searchMovies({ query: q, page, year })
-          : await tmdb.discoverMovies({ page, genreId, year });
+          : await tmdb.discoverMovies({ page, genreIds, year });
       } else {
-        page$ = q ? await tmdb.searchTv({ query: q, page, year }) : await tmdb.discoverTv({ page, genreId, year });
+        page$ = q ? await tmdb.searchTv({ query: q, page, year }) : await tmdb.discoverTv({ page, genreIds, year });
       }
       return {
         items: compact(page$.items.map((raw) => normalizeTmdbMedia(raw, mediaType, genreMap))),
@@ -222,10 +240,7 @@ export async function getGenreOptions({ type }) {
   const types = typesFor(type);
   const settled = await Promise.allSettled(
     types.map((t) =>
-      cache.getOrLoad(`genres:list:${t}`, TTL.genres, async () => {
-        if (t === 'ANIME') return anilist.getAnimeGenres();
-        return (await tmdb.getGenres(TMDB_PATH[t])).map((g) => g.name);
-      })
+      providerGenreNames(t)
     )
   );
 

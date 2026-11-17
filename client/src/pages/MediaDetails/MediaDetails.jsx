@@ -1,11 +1,17 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Star, ExternalLink, ImageOff } from 'lucide-react';
-import LibraryTracker from '../../components/library/LibraryTracker';
-import AppHeader from '../../components/layout/AppHeader';
-import AppFooter from '../../components/layout/AppFooter';
+import { ArrowLeft, ExternalLink, Star } from 'lucide-react';
+import Container from '../../components/layout/Container';
+import { HeroBackdrop, HeroPoster } from '../../components/media/MediaHero';
+import GenreBadges from '../../components/media/GenreBadges';
+import PosterImage from '../../components/media/PosterImage';
 import ProviderErrorState from '../../components/media/ProviderErrorState';
 import EmptyState from '../../components/media/EmptyState';
+import LibraryTracker from '../../components/library/LibraryTracker';
+import Badge from '../../components/ui/Badge';
+import Button from '../../components/ui/Button';
+import { Skeleton } from '../../components/ui/Skeleton';
+import { Reveal } from '../../components/ui/motion';
 import { getMediaDetails } from '../../services/api';
 import { useApiResource } from '../../hooks/useApiResource';
 import { TYPE_LABELS, PROVIDER_NAMES, formatDate, formatRuntime, humanize, mediaPath } from '../../components/media/mediaUtils';
@@ -14,24 +20,25 @@ function Fact({ label, value }) {
   if (value === null || value === undefined || value === '') return null;
   return (
     <div>
-      <dt className="text-[11px] uppercase tracking-wider text-[#6B7280]">{label}</dt>
-      <dd className="mt-0.5 text-sm text-[#F3F4F6]">{value}</dd>
+      <dt className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">{label}</dt>
+      <dd className="mt-1 text-sm text-fg">{value}</dd>
     </div>
   );
 }
 
 function DetailsSkeleton() {
   return (
-    <div className="animate-pulse" role="status" aria-label="Loading details">
-      <div className="h-64 bg-[#151922] sm:h-80" />
-      <div className="mx-auto -mt-32 flex max-w-6xl flex-col gap-6 px-4 sm:flex-row sm:px-6">
-        <div className="aspect-[2/3] w-44 shrink-0 rounded-xl border border-[#2A3245] bg-[#1C2230] sm:w-56" />
-        <div className="flex-1 space-y-3 pt-8">
-          <div className="h-8 w-2/3 rounded bg-[#1C2230]" />
-          <div className="h-4 w-1/3 rounded bg-[#1C2230]" />
-          <div className="h-24 w-full rounded bg-[#1C2230]" />
+    <div role="status" aria-label="Loading details">
+      <Skeleton className="h-72 w-full rounded-none sm:h-96" />
+      <Container className="-mt-40 flex flex-col gap-8 sm:flex-row">
+        <Skeleton className="aspect-[2/3] w-40 shrink-0 rounded-xl sm:w-60" />
+        <div className="flex-1 space-y-4 pt-4 sm:pt-24">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="h-10 w-2/3" />
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-28 w-full" />
         </div>
-      </div>
+      </Container>
     </div>
   );
 }
@@ -45,160 +52,127 @@ export default function MediaDetails() {
     [provider, mediaType, externalId]
   );
 
+  if (loading && !media) return <DetailsSkeleton />;
+
+  if (error) {
+    return (
+      <Container className="max-w-3xl py-16">
+        {error.code === 'MEDIA_NOT_FOUND' || error.status === 400 ? (
+          <EmptyState
+            title="Title not found"
+            message={error.message}
+            action={
+              <Button as={Link} to="/explore" variant="secondary">
+                Back to Explore
+              </Button>
+            }
+          />
+        ) : (
+          <ProviderErrorState error={error} onRetry={reload} />
+        )}
+      </Container>
+    );
+  }
+  if (!media) return null;
+
   return (
-    <div className="min-h-screen bg-[#0B0E14] text-[#F3F4F6]">
-      <AppHeader />
-      {loading && !media ? (
-        <DetailsSkeleton />
-      ) : error ? (
-        <main className="mx-auto max-w-3xl px-4 py-16">
-          {error.code === 'MEDIA_NOT_FOUND' || error.status === 400 ? (
-            <EmptyState
-              title="Title not found"
-              message={error.message}
-              action={
-                <Link to="/explore" className="mt-4 text-sm font-medium text-red-400 hover:text-red-300">
-                  Back to Explore
-                </Link>
-              }
-            />
-          ) : (
-            <ProviderErrorState error={error} onRetry={reload} />
-          )}
-        </main>
-      ) : media ? (
-        <article>
-          <div className="relative h-64 overflow-hidden bg-[#151922] sm:h-80">
-            {media.backdropUrl && (
-              <img src={media.backdropUrl} alt="" className="h-full w-full object-cover opacity-50" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#0B0E14] via-[#0B0E14]/60 to-transparent" />
-          </div>
+    <article>
+      <HeroBackdrop media={media} />
 
-          <div className="mx-auto -mt-36 max-w-6xl px-4 sm:px-6">
-            <button
-              type="button"
-              onClick={() => (location.key !== 'default' ? navigate(-1) : navigate('/explore'))}
-              className="relative mb-4 inline-flex items-center gap-1.5 text-sm text-[#D1D5DB] hover:text-white"
-            >
-              <ArrowLeft className="h-4 w-4" /> Back
-            </button>
+      <Container className="-mt-44 sm:-mt-52">
+        <nav aria-label="Breadcrumb" className="relative mb-5 flex items-center justify-between gap-3 text-xs text-fg-muted">
+          <ol className="flex min-w-0 items-center gap-1.5">
+            <li><Link to="/explore" className="transition hover:text-fg">Explore</Link></li>
+            <li aria-hidden="true">/</li>
+            <li className="truncate text-fg" aria-current="page">{media.title}</li>
+          </ol>
+          <Button size="sm" variant="ghost" leftIcon={ArrowLeft} onClick={() => (location.key !== 'default' ? navigate(-1) : navigate('/explore'))}>
+            Back
+          </Button>
+        </nav>
 
-            <div className="relative flex flex-col gap-6 sm:flex-row">
-              <div className="w-44 shrink-0 sm:w-60">
-                <div className="aspect-[2/3] overflow-hidden rounded-xl border border-[#2A3245] bg-[#151922] shadow-2xl shadow-black/60">
-                  {media.posterUrl ? (
-                    <img src={media.posterUrl} alt={`${media.title} poster`} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full flex-col items-center justify-center gap-2 text-[#9CA3AF]">
-                      <ImageOff className="h-7 w-7" />
-                      <span className="text-xs">No poster available</span>
-                    </div>
-                  )}
-                </div>
-              </div>
+        <div className="relative flex flex-col gap-8 sm:flex-row">
+          <Reveal>
+            <HeroPoster media={media} />
+          </Reveal>
 
-              <div className="flex-1 pt-2 sm:pt-20">
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="rounded-md border border-[#2A3245] bg-[#1C2230] px-2 py-0.5 font-semibold uppercase tracking-wide text-[#D1D5DB]">
-                    {TYPE_LABELS[media.mediaType]}
-                  </span>
-                  {media.sourceRating != null && (
-                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-950/40 px-2 py-0.5 font-semibold text-amber-400">
-                      <Star className="h-3 w-3 fill-amber-400" />
-                      {media.sourceRating.toFixed(1)} / 10
-                      <span className="font-normal text-amber-200/70">{media.sourceRatingName}</span>
-                    </span>
-                  )}
-                </div>
-
-                <h1 className="mt-2 text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
-                  {media.title}
-                  {media.releaseYear && <span className="ml-2 text-xl font-normal text-[#9CA3AF]">({media.releaseYear})</span>}
-                </h1>
-                {media.originalTitle && <p className="mt-1 text-sm text-[#9CA3AF]">{media.originalTitle}</p>}
-                {media.tagline && <p className="mt-2 text-sm italic text-[#D1D5DB]">{media.tagline}</p>}
-
-                {media.genres.length > 0 && (
-                  <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Genres">
-                    {media.genres.map((g) => (
-                      <li key={g}>
-                        <Link
-                          to={`/explore?type=${media.mediaType}&genre=${encodeURIComponent(g)}`}
-                          className="block rounded-full border border-[#2A3245] bg-[#151922] px-3 py-1 text-xs text-[#D1D5DB] transition hover:border-red-500/60 hover:text-white"
-                        >
-                          {g}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <div className="mt-5">
-                  <h2 className="text-sm font-semibold uppercase tracking-wider text-[#9CA3AF]">Overview</h2>
-                  <p className="mt-2 max-w-3xl whitespace-pre-line text-sm leading-relaxed text-[#E5E7EB]">
-                    {media.overview || 'No overview is available for this title.'}
-                  </p>
-                </div>
-
-                <dl className="mt-6 grid max-w-3xl grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3">
-                  <Fact label={media.mediaType === 'MOVIE' ? 'Release date' : 'First aired'} value={formatDate(media.releaseDate)} />
-                  <Fact label="Last aired" value={formatDate(media.endDate)} />
-                  <Fact label="Status" value={humanize(media.status)} />
-                  <Fact label="Format" value={humanize(media.format)} />
-                  <Fact label="Episodes" value={media.totalEpisodes} />
-                  <Fact label="Seasons" value={media.totalSeasons} />
-                  <Fact
-                    label={media.mediaType === 'MOVIE' ? 'Runtime' : 'Episode length'}
-                    value={formatRuntime(media.runtimeMinutes)}
-                  />
-                  <Fact label="Studio" value={media.studios?.length ? media.studios.join(', ') : null} />
-                </dl>
-
-                <LibraryTracker key={`${media.provider}:${media.mediaType}:${media.externalId}`} media={media} />
-
-                <div className="mt-6 flex flex-wrap items-center gap-3">
-                  {media.sourceUrl && (
-                    <a
-                      href={media.sourceUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-lg border border-[#2A3245] bg-[#1C2230] px-4 py-2 text-sm font-medium text-white transition hover:bg-[#2A3245]"
-                    >
-                      View on {PROVIDER_NAMES[media.provider]} <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
-                  )}
-                </div>
-                <p className="mt-3 text-xs text-[#6B7280]">
-                  Data and images provided by {PROVIDER_NAMES[media.provider]}.
-                </p>
-              </div>
+          <Reveal delay={0.08} className="min-w-0 flex-1 sm:pt-20">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="neutral">{TYPE_LABELS[media.mediaType]}</Badge>
+              {media.sourceRating != null && (
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-amber/30 bg-amber/10 px-2 py-0.5 text-xs font-semibold text-amber">
+                  <Star className="h-3 w-3 fill-amber" aria-hidden="true" />
+                  {media.sourceRating.toFixed(1)} / 10
+                  <span className="font-normal opacity-70">{media.sourceRatingName}</span>
+                </span>
+              )}
             </div>
 
-            {media.relations?.length > 0 && (
-              <section className="mt-12" aria-label="Related anime">
-                <h2 className="mb-4 text-lg font-semibold text-white">Related</h2>
-                <ul className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6">
-                  {media.relations.map((rel) => (
-                    <li key={rel.externalId}>
-                      <Link to={mediaPath(rel)} className="group block">
-                        <div className="aspect-[2/3] overflow-hidden rounded-lg border border-[#2A3245] bg-[#151922] transition group-hover:border-[#3B455E]">
-                          {rel.posterUrl && (
-                            <img src={rel.posterUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
-                          )}
-                        </div>
-                        <p className="mt-1.5 line-clamp-2 text-xs text-[#F3F4F6]">{rel.title}</p>
-                        <p className="text-[11px] text-[#9CA3AF]">{humanize(rel.relationType)}</p>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-          </div>
-        </article>
-      ) : null}
-      <AppFooter />
-    </div>
+            <h1 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight text-fg sm:text-5xl">
+              {media.title}
+              {media.releaseYear && <span className="ml-3 text-xl font-normal text-fg-subtle sm:text-2xl">({media.releaseYear})</span>}
+            </h1>
+            {media.originalTitle && <p className="mt-1.5 text-sm text-fg-muted">{media.originalTitle}</p>}
+            {media.tagline && <p className="mt-3 text-sm italic text-fg-muted">{media.tagline}</p>}
+
+            <div className="mt-5">
+              <GenreBadges genres={media.genres} mediaType={media.mediaType} />
+            </div>
+
+            <div className="mt-6">
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">Overview</h2>
+              <p className="mt-2 max-w-3xl whitespace-pre-line text-[15px] leading-relaxed text-fg/90">
+                {media.overview || 'No overview is available for this title.'}
+              </p>
+            </div>
+
+            <dl className="mt-7 grid max-w-3xl grid-cols-2 gap-x-6 gap-y-5 border-t border-ink-line pt-6 sm:grid-cols-3">
+              <Fact label={media.mediaType === 'MOVIE' ? 'Release date' : 'First aired'} value={formatDate(media.releaseDate)} />
+              <Fact label="Last aired" value={formatDate(media.endDate)} />
+              <Fact label="Status" value={humanize(media.status)} />
+              <Fact label="Format" value={humanize(media.format)} />
+              <Fact label="Episodes" value={media.totalEpisodes} />
+              <Fact label="Seasons" value={media.totalSeasons} />
+              <Fact label={media.mediaType === 'MOVIE' ? 'Runtime' : 'Episode length'} value={formatRuntime(media.runtimeMinutes)} />
+              <Fact label="Studio" value={media.studios?.length ? media.studios.join(', ') : null} />
+            </dl>
+
+            <LibraryTracker key={`${media.provider}:${media.mediaType}:${media.externalId}`} media={media} />
+
+            <div className="mt-8 flex flex-wrap items-center gap-3">
+              {media.sourceUrl && (
+                <Button as="a" href={media.sourceUrl} target="_blank" rel="noopener noreferrer" variant="secondary" size="sm" rightIcon={ExternalLink}>
+                  View on {PROVIDER_NAMES[media.provider]}
+                </Button>
+              )}
+              <p className="text-xs text-fg-subtle">Data and images provided by {PROVIDER_NAMES[media.provider]}.</p>
+            </div>
+          </Reveal>
+        </div>
+
+        {media.relations?.length > 0 && (
+          <section className="mt-16" aria-label="Related anime">
+            <h2 className="mb-4 border-b border-ink-line pb-3 text-xl font-semibold tracking-tight text-fg">Related</h2>
+            <ul className="no-scrollbar -mx-4 flex gap-4 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+              {media.relations.map((rel) => (
+                <li key={rel.externalId} className="w-32 shrink-0 sm:w-36">
+                  <Link to={mediaPath(rel)} className="group block">
+                    <PosterImage
+                      src={rel.posterUrl}
+                      alt=""
+                      className="aspect-[2/3] rounded-lg border border-ink-edge transition group-hover:border-[#3b455e]"
+                      imgClassName="transition-transform duration-500 group-hover:scale-105"
+                      fallbackLabel=""
+                    />
+                    <p className="mt-2 line-clamp-2 text-xs text-fg">{rel.title}</p>
+                    <p className="text-[11px] text-fg-subtle">{humanize(rel.relationType)}</p>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </Container>
+    </article>
   );
 }

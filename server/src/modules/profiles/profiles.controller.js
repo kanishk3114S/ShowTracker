@@ -1,6 +1,8 @@
 import { withUserTransaction } from '../../db/withUserTransaction.js';
 import { query } from '../../config/database.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { loadPublicProfile } from './profiles.public.js';
+import { listLibraryQuerySchema } from '../library/library.validation.js';
 import { 
   updateProfileSchema, 
   checkUsernameSchema, 
@@ -15,7 +17,7 @@ export async function checkUsernameAvailability(req, res, next) {
   try {
     const parseResult = checkUsernameSchema.safeParse(req.query);
     if (!parseResult.success) {
-      return next(new AppError('Invalid username query parameter.', 400, 'VALIDATION_ERROR', parseResult.error.errors));
+      return next(new AppError('Invalid username query parameter.', 400, 'VALIDATION_ERROR', parseResult.error.issues));
     }
 
     const rawUsername = parseResult.data.username;
@@ -62,7 +64,7 @@ export async function updateMyProfile(req, res, next) {
 
     const parseResult = updateProfileSchema.safeParse(req.body);
     if (!parseResult.success) {
-      return next(new AppError('Validation failed.', 400, 'VALIDATION_ERROR', parseResult.error.errors));
+      return next(new AppError('Validation failed.', 400, 'VALIDATION_ERROR', parseResult.error.issues));
     }
 
     const {
@@ -166,7 +168,9 @@ export async function updateMyProfile(req, res, next) {
 
 /**
  * GET /api/users/:username
- * Public profile viewer with privacy enforcement.
+ * Public profile viewer with strict privacy enforcement (see profiles.public.js).
+ * Responds 404 both for unknown usernames and for private profiles viewed by
+ * anyone but their owner, so the endpoint reveals nothing extra.
  */
 export async function getPublicProfile(req, res, next) {
   try {
@@ -175,52 +179,27 @@ export async function getPublicProfile(req, res, next) {
       return next(new AppError('Username parameter is required.', 400, 'MISSING_USERNAME'));
     }
 
-    const normalized = rawUsername.toLowerCase().trim();
-    const callerId = req.user?.id || null;
-
-    // Public safe projection: never expose email, passwords, or internal auth metadata
-    const profileRes = await query(
-      `SELECT
-        id,
-        username,
-        display_name,
-        avatar_url,
-        bio,
-        profile_visibility,
-        library_visibility,
-        created_at
-      FROM public.profiles
-      WHERE LOWER(username) = $1
-      LIMIT 1;`,
-      [normalized]
-    );
-
-    if (profileRes.rows.length === 0) {
+    const username = rawUsername.toLowerCase().trim();
+    // Usernames are 3-30 chars of [a-z0-9_]; anything else cannot exist, so skip the database.
+    if (!usernameRegex.test(username)) {
       return next(new AppError('User not found.', 404, 'USER_NOT_FOUND'));
     }
 
-    const profile = profileRes.rows[0];
-    const isOwner = callerId && callerId === profile.id;
-
-    // Privacy rule: if profile_visibility is PRIVATE and caller is not owner, return 404
-    if (profile.profile_visibility === 'PRIVATE' && !isOwner) {
-      return next(new AppError('User not found or profile is private.', 404, 'USER_NOT_FOUND'));
+    const parsed = listLibraryQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      const details = parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
+      return next(new AppError('Invalid library filters.', 400, 'VALIDATION_ERROR', details));
     }
 
-    res.json({
-      success: true,
-      profile: {
-        id: profile.id,
-        username: profile.username,
-        display_name: profile.display_name,
-        avatar_url: profile.avatar_url,
-        bio: profile.bio,
-        profile_visibility: profile.profile_visibility,
-        library_visibility: profile.library_visibility,
-        created_at: profile.created_at,
-        isOwner: Boolean(isOwner)
-      }
+    const result = await loadPublicProfile({
+      username,
+      callerId: req.user?.id || null,
+      filters: parsed.data
     });
+    if (!result) return next(new AppError('User not found.', 404, 'USER_NOT_FOUND'));
+
+    // The response differs per viewer (owner vs stranger), so shared caches must not keep it.
+    res.set('Cache-Control', 'private, no-store').json({ success: true, ...result });
   } catch (err) {
     next(err);
   }
