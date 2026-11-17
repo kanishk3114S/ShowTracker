@@ -1274,3 +1274,20 @@ ShowTracker's first successful release is not measured by the number of pages or
 - AniList rate limiting: https://github.com/AniList/docs/blob/master/docs/guide/rate-limiting.md
 - TMDB developer documentation: https://developer.themoviedb.org/docs
 - TMDB API FAQ and attribution/commercial-use guidance: https://developer.themoviedb.org/docs/faq
+
+
+---
+
+## Phase 3 (Implemented): Media Discovery and Catalog
+
+**Delivered:** search for anime (AniList), movies and TV (TMDB) in one interface; trending lists; media details pages; a shared catalog (`media_items`, `media_sources`, `genres`, `media_genres`) filled when a details page is opened; TTL caching and provider-failure handling; TMDB attribution page and footer.
+
+**Routes:** `/explore`, `/trending`, `/media/:provider/:mediaType/:externalId`, `/about`. API: `/api/media/search`, `/trending`, `/details/...`, `/genres`.
+
+**Behaviour decisions**
+- Trending is labelled accurately: TMDB day/week; AniList's own trending ranking with no time window. There is no monthly view.
+- Genre filtering works for anime in any mode and for movies/TV when browsing without text; TMDB text search cannot filter by genre and the UI says so.
+- Adult anime is excluded from discovery.
+- "Add to library" is shown disabled and labelled "coming soon".
+
+**Out of scope (Phase 4+):** user library, watch status, episode progress, seasons/episodes tables, user ratings, favorites, history, stats, collections, social features, recommendations, Redis.

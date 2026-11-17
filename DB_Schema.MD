@@ -264,3 +264,92 @@ In PostgreSQL, security best practices demand least-privilege access:
 3. **Database & Migrations**:
    - Navigate to **Database** &rarr; **Roles** to inspect `showtracker_app`.
    - Navigate to **Database** &rarr; **Policies** to visually review the RLS policies on `profiles`.
+
+
+---
+
+## Phase 3: Shared Media Catalog (migration `002_create_media_catalog.sql`)
+
+### What these tables are for
+
+`media_items`, `media_sources`, `genres` and `media_genres` hold **shared** data: one row per title, the same for every user. A title is saved the first time someone opens its details page (search-result cards are *not* stored). Personal data such as "I'm watching this" or "I rated it 9" will live in separate **user-scoped** tables in Phase 4 that point at `media_items.id`. That split is why catalog tables have no `user_id` and are not filtered per user, while Phase 4 tables will be.
+
+### ER diagram
+
+```mermaid
+erDiagram
+    media_items ||--o{ media_sources : "has external ids"
+    media_items ||--o{ media_genres : "tagged with"
+    genres ||--o{ media_genres : "used by"
+
+    media_items {
+        uuid id PK
+        text media_type "ANIME | MOVIE | TV"
+        text title
+        text original_title
+        text overview
+        text poster_path
+        text backdrop_path
+        date release_date
+        numeric source_rating "0-10"
+        numeric popularity
+        jsonb metadata
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    media_sources {
+        uuid id PK
+        uuid media_id FK
+        text provider "ANILIST | TMDB"
+        text provider_media_type
+        text external_id
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    genres {
+        uuid id PK
+        text name "unique, case-insensitive"
+        timestamptz created_at
+    }
+    media_genres {
+        uuid media_id PK,FK
+        uuid genre_id PK,FK
+    }
+```
+
+### Key concepts
+
+- **Primary key (PK)**: a column that uniquely identifies a row. Here each table uses a random UUID, except `media_genres`, whose primary key is the *pair* `(media_id, genre_id)`.
+- **Foreign key (FK)**: a column that must match a row in another table. `media_sources.media_id` must be a real `media_items.id`; `ON DELETE CASCADE` removes the child rows if the title is deleted.
+- **Many-to-many**: a title has many genres and a genre has many titles. A plain column cannot store that, so a *link table* (`media_genres`) holds one row per (title, genre) pair. The composite primary key makes duplicate pairs impossible.
+- **Provider identifiers**: `UNIQUE (provider, provider_media_type, external_id)` stops the same provider record being imported twice. `provider_media_type` is part of it because TMDB movie 550 and TMDB TV 550 are different titles. AniList and TMDB ids are never treated as interchangeable, and titles are never merged because their names look similar.
+- **Case-insensitive genres**: a unique index on `LOWER(name)` makes "Action" and "action" the same genre.
+- **Ratings**: `source_rating` is the provider's public rating normalized to 0-10 (AniList's 0-100 score divided by 10). It is not the user's own rating. A CHECK constraint enforces 0-10.
+
+### Persistence strategy
+
+Opening a details page calls `upsertMediaFromDetails` inside one transaction: take an advisory lock on the provider id (so two simultaneous requests cannot both insert), look up `media_sources`, update or insert `media_items` + `media_sources`, then make `media_genres` match the provider's current genre list. Repeating the request updates the same rows.
+
+### Security
+
+RLS is enabled on all four tables. `anon` and `authenticated` (Supabase's public API roles) have no access; the backend role `showtracker_app` gets SELECT/INSERT/UPDATE on items and sources, SELECT/INSERT on genres, SELECT/INSERT/DELETE on `media_genres` (to refresh genre links), and no TRUNCATE. Policies allow only `showtracker_app`.
+
+### Example queries
+
+```sql
+-- A title with its genres and provider ids
+SELECT mi.title, mi.media_type, ms.provider, ms.external_id,
+       array_agg(g.name ORDER BY g.name) AS genres
+FROM media_items mi
+JOIN media_sources ms ON ms.media_id = mi.id
+LEFT JOIN media_genres mg ON mg.media_id = mi.id
+LEFT JOIN genres g ON g.id = mg.genre_id
+GROUP BY mi.id, ms.provider, ms.external_id;
+
+-- All stored titles in a genre
+SELECT mi.title
+FROM genres g
+JOIN media_genres mg ON mg.genre_id = g.id
+JOIN media_items mi ON mi.id = mg.media_id
+WHERE LOWER(g.name) = 'drama';
+```

@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import healthRoutes from './modules/health/health.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import profileRoutes from './modules/profiles/profiles.routes.js';
+import mediaRoutes from './modules/media/media.routes.js';
 import { getPublicProfile } from './modules/profiles/profiles.controller.js';
 import { optionalAuth } from './middleware/requireAuth.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
@@ -38,6 +39,7 @@ if (process.env.NODE_ENV !== 'test') {
 app.use('/api/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/profiles', profileRoutes);
+app.use('/api/media', mediaRoutes);
 
 // Direct /api/users/:username route for public profile lookup
 app.get('/api/users/:username', optionalAuth, getPublicProfile);

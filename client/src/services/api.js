@@ -75,6 +75,49 @@ export async function getPublicProfile(username) {
   return res.data;
 }
 
+// ---------------------------------------------------------------- media ----
+// The browser only talks to our Express API; AniList and TMDB are never called directly.
+
+/** Turns any axios failure into { code, message, retryAfterSeconds } for the UI. Cancelled requests return null. */
+export function toApiError(err) {
+  if (axios.isCancel(err) || err?.code === 'ERR_CANCELED') return null;
+  const apiError = err.response?.data?.error;
+  return {
+    code: apiError?.code || (err.response ? 'REQUEST_FAILED' : 'NETWORK_ERROR'),
+    message:
+      apiError?.message ||
+      (err.response ? 'The request failed.' : 'Could not reach the ShowTracker server. Is the backend running?'),
+    retryAfterSeconds: apiError?.details?.retryAfterSeconds ?? null,
+    status: err.response?.status ?? null
+  };
+}
+
+const cleanParams = (params) =>
+  Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+
+export async function searchMedia(params, signal) {
+  const res = await apiClient.get('/media/search', { params: cleanParams(params), signal });
+  return res.data.data;
+}
+
+export async function getTrendingMedia(params, signal) {
+  const res = await apiClient.get('/media/trending', { params: cleanParams(params), signal });
+  return res.data.data;
+}
+
+export async function getMediaGenres(type, signal) {
+  const res = await apiClient.get('/media/genres', { params: { type }, signal });
+  return res.data.data;
+}
+
+export async function getMediaDetails({ provider, mediaType, externalId }, signal) {
+  const res = await apiClient.get(
+    `/media/details/${encodeURIComponent(provider)}/${encodeURIComponent(mediaType)}/${encodeURIComponent(externalId)}`,
+    { signal }
+  );
+  return res.data.data;
+}
+
 export default {
   apiClient,
   checkApiHealth,

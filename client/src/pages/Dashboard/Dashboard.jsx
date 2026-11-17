@@ -55,6 +55,20 @@ export default function Dashboard() {
 
           <div className="flex items-center space-x-3">
             <Link
+              to="/explore"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-white transition-all"
+            >
+              <span>Explore</span>
+            </Link>
+
+            <Link
+              to="/trending"
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-white transition-all"
+            >
+              <span>Trending</span>
+            </Link>
+
+            <Link
               to="/settings"
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#1C2230] hover:bg-[#2A3245] border border-[#2A3245] text-white transition-all"
             >

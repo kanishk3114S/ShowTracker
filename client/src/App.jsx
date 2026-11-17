@@ -11,6 +11,10 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import Settings from './pages/Settings/Settings';
 import PublicProfile from './pages/PublicProfile/PublicProfile';
 import Health from './pages/Health/Health';
+import Explore from './pages/Explore/Explore';
+import Trending from './pages/Trending/Trending';
+import MediaDetails from './pages/MediaDetails/MediaDetails';
+import Credits from './pages/Credits/Credits';
 
 export default function App() {
   return (
@@ -59,6 +63,12 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* Phase 3: public media catalog */}
+          <Route path="/explore" element={<Explore />} />
+          <Route path="/trending" element={<Trending />} />
+          <Route path="/media/:provider/:mediaType/:externalId" element={<MediaDetails />} />
+          <Route path="/about" element={<Credits />} />
 
           {/* Public Profile View */}
           <Route path="/u/:username" element={<PublicProfile />} />

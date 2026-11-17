@@ -1,0 +1,254 @@
+import * as anilist from '../providers/anilist.provider.js';
+import * as tmdb from '../providers/tmdb.provider.js';
+import { ProviderError } from '../providers/providerError.js';
+import { normalizeAniListMedia, normalizeTmdbMedia, compact } from './mediaNormalizer.js';
+import { upsertMediaFromDetails } from './mediaPersistence.service.js';
+import { TTLCache } from '../utils/ttlCache.js';
+
+/**
+ * Chooses the right provider for each media type and shapes provider results
+ * into the unified response.
+ *
+ *   ANIME -> AniList      MOVIE -> TMDB      TV -> TMDB
+ *
+ * Cached results are short-lived API responses, NOT catalog data. Permanent
+ * catalog rows are only written when a details page is opened.
+ */
+const TTL = {
+  trending: 10 * 60 * 1000,
+  search: 90 * 1000,
+  details: 30 * 60 * 1000,
+  genres: 24 * 60 * 60 * 1000
+};
+
+// Exported so tests can clear it.
+export const cache = new TTLCache({ maxEntries: 500 });
+
+const PROVIDER_FOR_TYPE = { ANIME: 'ANILIST', MOVIE: 'TMDB', TV: 'TMDB' };
+const TMDB_PATH = { MOVIE: 'movie', TV: 'tv' };
+const ALL_TYPES = ['ANIME', 'MOVIE', 'TV'];
+
+const typesFor = (type) => (type === 'ALL' ? ALL_TYPES : [type]);
+
+const errorSummary = (err) => ({
+  code: err.code || 'PROVIDER_ERROR',
+  message: err.message,
+  provider: err.provider ?? null,
+  retryAfterSeconds: err.retryAfterSeconds ?? null
+});
+
+/** id -> name map for TMDB genre ids (cached 24h). */
+async function getTmdbGenreMap(mediaType) {
+  const genres = await cache.getOrLoad(`genres:tmdb:${mediaType}`, TTL.genres, () =>
+    tmdb.getGenres(TMDB_PATH[mediaType])
+  );
+  return new Map(genres.map((g) => [g.id, g.name]));
+}
+
+/** Runs one provider call for one media type and returns a normalized "group". */
+async function buildGroup(mediaType, loader) {
+  const { items, pageInfo, extra } = await loader();
+  return {
+    mediaType,
+    provider: PROVIDER_FOR_TYPE[mediaType],
+    results: items,
+    pagination: pageInfo,
+    ...extra
+  };
+}
+
+/**
+ * Runs a group for each requested type concurrently.
+ * - single type: errors propagate (so the HTTP status is meaningful)
+ * - ALL: a failing provider becomes `group.error`; successful groups are kept
+ */
+async function runGroups(type, makeGroup) {
+  const types = typesFor(type);
+  if (types.length === 1) return [await makeGroup(types[0])];
+
+  const settled = await Promise.allSettled(types.map((t) => makeGroup(t)));
+  const groups = settled.map((outcome, i) => {
+    if (outcome.status === 'fulfilled') return { ...outcome.value, error: null };
+    const err = outcome.reason;
+    if (!(err instanceof ProviderError)) {
+      console.error(`[MediaCatalog] Unexpected failure for ${types[i]}:`, err);
+    }
+    return {
+      mediaType: types[i],
+      provider: PROVIDER_FOR_TYPE[types[i]],
+      results: [],
+      pagination: { page: 1, totalPages: 0, totalResults: 0, hasNextPage: false },
+      error: err instanceof ProviderError ? errorSummary(err) : { code: 'INTERNAL_ERROR', message: 'Unexpected error.' }
+    };
+  });
+
+  // If everything failed there is nothing useful to show: surface the first error normally.
+  const firstFailure = settled.find((o) => o.status === 'rejected');
+  if (firstFailure && settled.every((o) => o.status === 'rejected')) throw firstFailure.reason;
+  return groups;
+}
+
+const withNoError = (group) => ({ ...group, error: group.error ?? null });
+
+// ------------------------------------------------------------------ search --
+
+async function searchGroup(mediaType, { q, page, genre, year }) {
+  const key = `search:${mediaType}:${(q || '').toLowerCase()}:${page}:${(genre || '').toLowerCase()}:${year || ''}`;
+  return cache.getOrLoad(key, q ? TTL.search : TTL.trending, () =>
+    buildGroup(mediaType, async () => {
+      if (mediaType === 'ANIME') {
+        const { items, pageInfo } = await anilist.searchAnime({ search: q, page, genre, year });
+        return { items: compact(items.map(normalizeAniListMedia)), pageInfo };
+      }
+
+      const genreMap = await getTmdbGenreMap(mediaType);
+      const ignoredFilters = [];
+      let genreId;
+      if (genre) {
+        if (q) {
+          // TMDB's text search cannot filter by genre; say so instead of silently mis-filtering.
+          ignoredFilters.push('genre');
+        } else {
+          genreId = [...genreMap.entries()].find(([, name]) => name.toLowerCase() === genre.toLowerCase())?.[0];
+          if (genreId === undefined) {
+            // This provider has no such genre for this type -> honest empty result.
+            return {
+              items: [],
+              pageInfo: { page, totalPages: 0, totalResults: 0, hasNextPage: false },
+              extra: { ignoredFilters }
+            };
+          }
+        }
+      }
+
+      let page$;
+      if (mediaType === 'MOVIE') {
+        page$ = q
+          ? await tmdb.searchMovies({ query: q, page, year })
+          : await tmdb.discoverMovies({ page, genreId, year });
+      } else {
+        page$ = q ? await tmdb.searchTv({ query: q, page, year }) : await tmdb.discoverTv({ page, genreId, year });
+      }
+      return {
+        items: compact(page$.items.map((raw) => normalizeTmdbMedia(raw, mediaType, genreMap))),
+        pageInfo: page$.pageInfo,
+        extra: { ignoredFilters }
+      };
+    })
+  );
+}
+
+export async function searchMedia({ q, type, page, genre, year }) {
+  const groups = await runGroups(type, (t) => searchGroup(t, { q, page, genre, year }));
+  return {
+    type,
+    query: q || null,
+    mode: q ? 'search' : 'browse',
+    page,
+    groups: groups.map(withNoError)
+  };
+}
+
+// ---------------------------------------------------------------- trending --
+
+async function trendingGroup(mediaType, { window, page }) {
+  const effectiveWindow = mediaType === 'ANIME' ? 'ranking' : window;
+  const key = `trending:${mediaType}:${effectiveWindow}:${page}`;
+  return cache.getOrLoad(key, TTL.trending, () =>
+    buildGroup(mediaType, async () => {
+      if (mediaType === 'ANIME') {
+        const { items, pageInfo } = await anilist.getTrendingAnime({ page });
+        return {
+          items: compact(items.map(normalizeAniListMedia)),
+          pageInfo,
+          extra: {
+            window: null,
+            // AniList exposes only its own trending ranking, no day/week/month filter.
+            label: 'AniList trending ranking'
+          }
+        };
+      }
+      const genreMap = await getTmdbGenreMap(mediaType);
+      const { items, pageInfo } = await tmdb.getTrending({ mediaType: TMDB_PATH[mediaType], window, page });
+      return {
+        items: compact(items.map((raw) => normalizeTmdbMedia(raw, mediaType, genreMap))),
+        pageInfo,
+        extra: { window, label: window === 'day' ? 'Trending today on TMDB' : 'Trending this week on TMDB' }
+      };
+    })
+  );
+}
+
+export async function getTrendingMedia({ type, window, page }) {
+  const groups = await runGroups(type, (t) => trendingGroup(t, { window, page }));
+  return { type, window, page, groups: groups.map(withNoError) };
+}
+
+// ----------------------------------------------------------------- details --
+
+export async function getMediaDetails({ provider, mediaType, externalId, refresh = false }) {
+  const key = `details:${provider}:${mediaType}:${externalId}`;
+  return cache.getOrLoad(
+    key,
+    TTL.details,
+    async () => {
+      let media;
+      if (provider === 'ANILIST') {
+        media = normalizeAniListMedia(await anilist.getAnimeDetails(externalId));
+      } else {
+        const raw =
+          mediaType === 'MOVIE' ? await tmdb.getMovieDetails(externalId) : await tmdb.getTvDetails(externalId);
+        media = normalizeTmdbMedia(raw, mediaType);
+      }
+      if (!media) throw new ProviderError(provider === 'ANILIST' ? 'AniList' : 'TMDB', 'NOT_FOUND');
+
+      // Opening a details page adds the title to the shared catalog (idempotent upsert).
+      // A database problem must not break browsing, so it is logged and the page still renders.
+      let catalogId = null;
+      try {
+        catalogId = await upsertMediaFromDetails(media);
+      } catch (err) {
+        console.error('[MediaCatalog] Could not persist media to catalog:', err.message);
+      }
+      return { ...media, catalogId };
+    },
+    { refresh }
+  );
+}
+
+// ------------------------------------------------------------------ genres --
+
+export async function getGenreOptions({ type }) {
+  const types = typesFor(type);
+  const settled = await Promise.allSettled(
+    types.map((t) =>
+      cache.getOrLoad(`genres:list:${t}`, TTL.genres, async () => {
+        if (t === 'ANIME') return anilist.getAnimeGenres();
+        return (await tmdb.getGenres(TMDB_PATH[t])).map((g) => g.name);
+      })
+    )
+  );
+
+  if (types.length === 1 && settled[0].status === 'rejected') throw settled[0].reason;
+  if (settled.every((o) => o.status === 'rejected')) throw settled[0].reason;
+
+  const names = new Map(); // lowercase -> display name (case-insensitive union)
+  const errors = [];
+  settled.forEach((outcome, i) => {
+    if (outcome.status === 'fulfilled') {
+      outcome.value.forEach((name) => {
+        if (!names.has(name.toLowerCase())) names.set(name.toLowerCase(), name);
+      });
+    } else if (outcome.reason instanceof ProviderError) {
+      errors.push({ mediaType: types[i], ...errorSummary(outcome.reason) });
+    }
+  });
+
+  return {
+    type,
+    genres: [...names.values()].sort((a, b) => a.localeCompare(b)),
+    errors
+  };
+}
+
+export default { searchMedia, getTrendingMedia, getMediaDetails, getGenreOptions, cache };
