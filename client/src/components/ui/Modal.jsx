@@ -110,7 +110,9 @@ export default function Modal({ open, onClose, title, description, ariaLabel, ba
             ) : (
               <>
                 {(title || !hideClose) && (
-                  <div className="flex items-start justify-between gap-4 border-b border-ink-line px-5 py-4">
+                  <div className="border-b border-ink-line">
+                    <div className="sprockets mx-5 mt-3 opacity-70" aria-hidden="true" />
+                    <div className="flex items-start justify-between gap-4 px-5 py-4">
                     <div>
                       {title && (
                         <h2 id={titleId} className="text-base font-semibold text-fg">
@@ -133,6 +135,7 @@ export default function Modal({ open, onClose, title, description, ariaLabel, ba
                         <X className="h-4 w-4" />
                       </button>
                     )}
+                    </div>
                   </div>
                 )}
                 <div className="p-5">{children}</div>

@@ -11,11 +11,13 @@
  */
 
 const NEUTRAL_PILL = 'border-white/10 bg-white/[0.06] text-zinc-200';
+// Amber-copper rim light on hover: the glint of a film case catching a projector beam.
+const RIM = 'group-hover:border-accent/45 group-hover:shadow-[0_0_0_1px_rgba(242,179,61,0.16),0_18px_40px_-20px_rgba(217,154,34,0.35)]';
 
 export const TYPE_THEME = {
-  ANIME: { label: 'Anime', pill: NEUTRAL_PILL, hover: 'group-hover:border-white/30', text: 'text-fg-muted', ring: 'ring-white/10' },
-  MOVIE: { label: 'Movie', pill: NEUTRAL_PILL, hover: 'group-hover:border-white/30', text: 'text-fg-muted', ring: 'ring-white/10' },
-  TV: { label: 'TV Show', pill: NEUTRAL_PILL, hover: 'group-hover:border-white/30', text: 'text-fg-muted', ring: 'ring-white/10' }
+  ANIME: { label: 'Anime', pill: NEUTRAL_PILL, hover: RIM, text: 'text-fg-muted', ring: 'ring-white/10' },
+  MOVIE: { label: 'Movie', pill: NEUTRAL_PILL, hover: RIM, text: 'text-fg-muted', ring: 'ring-white/10' },
+  TV: { label: 'TV Show', pill: NEUTRAL_PILL, hover: RIM, text: 'text-fg-muted', ring: 'ring-white/10' }
 };
 
 /** Status = neutral pill + one small colored dot. `live` statuses get a soft pulse. */

@@ -1,11 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
+import GhostMark from '../cinema/GhostMark';
 
 /** Page title block with optional breadcrumbs, description and right-aligned actions. */
-export default function PageHeader({ title, description, breadcrumbs = [], icon: Icon, actions }) {
+export default function PageHeader({ title, description, breadcrumbs = [], icon: Icon, actions, watermark }) {
   return (
     <header className="relative mb-8">
+      {watermark && <GhostMark text={watermark} position="right" className="!right-2 !top-2/3" />}
       {breadcrumbs.length > 0 && (
         <nav aria-label="Breadcrumb" className="mb-3">
           <ol className="flex flex-wrap items-center gap-1 text-xs text-fg-subtle">

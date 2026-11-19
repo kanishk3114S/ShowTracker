@@ -10,6 +10,7 @@ import { Reveal, Stagger, StaggerItem } from '../../components/ui/motion';
 import PublicLibraryCard from '../../components/library/PublicLibraryCard';
 import LibraryFilters, { SORTS } from '../../components/library/LibraryFilters';
 import StatCard from '../../components/dashboard/StatCard';
+import GhostMark from '../../components/cinema/GhostMark';
 import EditProfileModal from '../../components/profile/EditProfileModal';
 import { FeaturedShelf, MilestoneBadges, ViewingMix, pickFeatured } from '../../components/profile/ProfileShowcase';
 import EmptyState from '../../components/media/EmptyState';
@@ -130,6 +131,8 @@ export default function PublicProfile() {
             </>
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-ink-base via-ink-base/40 to-black/20" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(245,158,11,0.12),transparent_70%)]" />
+          <GhostMark text="『記録』" position="right" className="!right-6" />
         </div>
         <Container>
           <div className="flex flex-col gap-4 pb-8 sm:flex-row sm:items-start sm:justify-between">

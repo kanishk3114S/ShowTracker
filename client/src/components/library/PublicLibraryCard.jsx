@@ -1,7 +1,8 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { Heart, Lock, Star } from 'lucide-react';
+import PosterLink from '../ui/PosterLink';
+import { Heart, Lock } from 'lucide-react';
 import PosterImage from '../media/PosterImage';
+import RatingPill from '../cinema/RatingPill';
 import { StatusBadge } from '../ui/Badge';
 import ProgressBar, { toneForType } from '../ui/ProgressBar';
 import { TYPE_THEME } from '../ui/theme';
@@ -20,7 +21,7 @@ export default function PublicLibraryCard({ entry }) {
   const hasEpisodes = media.mediaType !== 'MOVIE';
   const inner = (
     <>
-      <div className={`relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 shadow-card transition duration-300 group-hover:-translate-y-2 ${theme.hover}`}>
+      <div className={`relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 shadow-card transition-[border-color,box-shadow] duration-300 ${theme.hover}`}>
         <PosterImage
           src={media.posterUrl}
           alt={`${media.title} poster`}
@@ -30,12 +31,7 @@ export default function PublicLibraryCard({ entry }) {
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent" />
         <StatusBadge status={entry.status} className="absolute left-2 top-2" />
-        {entry.rating !== null && (
-          <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/55 px-2 py-0.5 text-xs font-bold text-fg backdrop-blur-md">
-            <Star className="h-3 w-3 fill-accent text-accent" aria-hidden="true" />
-            {entry.rating.toFixed(1)}
-          </span>
-        )}
+        {entry.rating !== null && <RatingPill value={entry.rating} title="Rating" className="absolute right-2 top-2" />}
         {entry.isFavorite && (
           <span className="absolute bottom-3 right-2 rounded-full bg-black/55 p-1.5 backdrop-blur-md" title="Favorite">
             <Heart className="h-3.5 w-3.5 fill-red-500 text-red-500" aria-label="Favorite" />
@@ -68,9 +64,9 @@ export default function PublicLibraryCard({ entry }) {
     </>
   );
   return media.provider && media.externalId ? (
-    <Link to={mediaPath(media)} {...prefetchHandlers} className="group block rounded-2xl" aria-label={media.title}>
+    <PosterLink to={mediaPath(media)} {...prefetchHandlers} aria-label={media.title}>
       {inner}
-    </Link>
+    </PosterLink>
   ) : (
     <div className="group">{inner}</div>
   );

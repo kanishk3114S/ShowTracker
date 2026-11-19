@@ -64,7 +64,28 @@ export default function Library() {
     }
   };
 
-  const entries = data ?? [];
+  // Optimistic edits layered over the server data: { [entryId]: { status?, rating?, ... } }.
+  // Moving a title to another status while a status filter is on makes it leave the list instantly.
+  // The layer is dropped whenever fresh data arrives (it then contains the saved change), or on failure.
+  const [overrides, setOverrides] = useState({});
+  const [seenData, setSeenData] = useState(data);
+  if (data !== seenData) {
+    setSeenData(data);
+    setOverrides({});
+  }
+  const onOptimistic = (id, changes) => setOverrides((prev) => ({ ...prev, [id]: { ...prev[id], ...changes } }));
+  const onRevert = (id) =>
+    setOverrides((prev) => {
+      const { [id]: _undone, ...rest } = prev;
+      return rest;
+    });
+  const entries = useMemo(
+    () =>
+      (data ?? [])
+        .map((e) => (overrides[e.id] ? { ...e, ...overrides[e.id] } : e))
+        .filter((e) => !status || e.status === status),
+    [data, overrides, status]
+  );
   const filtered = Boolean(status || mediaType);
   const onChanged = () => {
     reload();
@@ -78,6 +99,7 @@ export default function Library() {
         title="My Library"
         breadcrumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'My Library' }]}
         description="Everything you watch, in one place."
+        watermark="『書庫』"
       />
 
       <div className="mb-4 flex justify-end">
@@ -118,6 +140,7 @@ export default function Library() {
         ) : entries.length === 0 ? (
           <EmptyState
             icon={LibraryIcon}
+            watermark="『書庫』"
             title={filtered ? 'No titles here' : 'Your library is empty'}
             message={filtered ? (EMPTY_COPY[status] ?? 'No titles match these filters.') : EMPTY_COPY['']}
             action={
@@ -134,7 +157,11 @@ export default function Library() {
           >
             {entries.map((entry) => (
               <StaggerItem key={entry.id}>
-                {view === 'grid' ? <LibraryCard entry={entry} onChanged={onChanged} /> : <LibraryRow entry={entry} onChanged={onChanged} />}
+                {view === 'grid' ? (
+                  <LibraryCard entry={entry} onChanged={onChanged} onOptimistic={onOptimistic} onRevert={onRevert} />
+                ) : (
+                  <LibraryRow entry={entry} onChanged={onChanged} onOptimistic={onOptimistic} onRevert={onRevert} />
+                )}
               </StaggerItem>
             ))}
           </Stagger>

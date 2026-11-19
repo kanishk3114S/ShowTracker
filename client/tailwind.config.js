@@ -5,7 +5,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif'],
+        // Elegant Mincho serif for the ghost kanji watermarks
+        mincho: ['"Shippori Mincho"', '"Yu Mincho"', '"Hiragino Mincho ProN"', '"Noto Serif JP"', 'serif']
       },
       colors: {
         // Neutral near-black surfaces (no color cast), stepped by elevation
@@ -65,6 +67,10 @@ export default {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-10px)' }
         },
+        twinkle: {
+          '0%, 100%': { transform: 'scale(1) rotate(0deg)', filter: 'brightness(1)' },
+          '50%': { transform: 'scale(1.18) rotate(12deg)', filter: 'brightness(1.4)' }
+        },
         'check-pop': {
           '0%': { transform: 'scale(0.4)', opacity: '0' },
           '60%': { transform: 'scale(1.25)', opacity: '1' },
@@ -76,6 +82,7 @@ export default {
         'ping-soft': 'ping-soft 1.8s cubic-bezier(0,0,0.2,1) infinite',
         sheen: 'sheen 0.9s ease-in-out',
         float: 'float 7s ease-in-out infinite',
+        twinkle: 'twinkle 3.2s ease-in-out infinite',
         'check-pop': 'check-pop 0.32s cubic-bezier(0.34,1.56,0.64,1) both'
       }
     }

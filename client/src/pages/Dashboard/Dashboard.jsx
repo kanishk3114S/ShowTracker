@@ -5,6 +5,7 @@ import Container from '../../components/layout/Container';
 import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
 import { Reveal, Stagger } from '../../components/ui/motion';
+import GhostMark from '../../components/cinema/GhostMark';
 import { Skeleton } from '../../components/ui/Skeleton';
 import StatCard from '../../components/dashboard/StatCard';
 import ContinueWatchingShelf from '../../components/dashboard/ContinueWatchingShelf';
@@ -88,6 +89,8 @@ export default function Dashboard() {
       <Reveal>
         <div className="glass relative overflow-hidden rounded-3xl p-6 sm:p-8">
           <div className="bg-dots mask-radial pointer-events-none absolute inset-0 opacity-60" aria-hidden="true" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(245,158,11,0.12),transparent_70%)]" aria-hidden="true" />
+          <GhostMark text="『記録』" position="right" className="!right-6" />
           <div className="relative flex flex-wrap items-center justify-between gap-6">
             <div className="flex items-center gap-5">
               <Avatar src={avatarUrl} name={fullName} size="xl" className="!h-16 !w-16 border-2 border-white/15 sm:!h-20 sm:!w-20" />

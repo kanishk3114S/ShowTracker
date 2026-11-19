@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Star } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import Container from '../../components/layout/Container';
 import { HeroBackdrop, HeroPoster } from '../../components/media/MediaHero';
+import RatingPill from '../../components/cinema/RatingPill';
+import BroadcastPill from '../../components/cinema/BroadcastPill';
 import GenreBadges from '../../components/media/GenreBadges';
 import PosterImage from '../../components/media/PosterImage';
 import ProviderErrorState from '../../components/media/ProviderErrorState';
@@ -96,13 +98,13 @@ export default function MediaDetails() {
           <Reveal delay={0.08} className="min-w-0 flex-1 sm:pt-20">
             <div className="flex flex-wrap items-center gap-2">
               <CategoryBadge type={media.mediaType} />
-              {media.sourceRating != null && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-0.5 text-xs font-bold text-fg">
-                  <Star className="h-3 w-3 fill-accent text-accent" aria-hidden="true" />
-                  {media.sourceRating.toFixed(1)} / 10
-                  <span className="font-normal opacity-70">{media.sourceRatingName}</span>
-                </span>
-              )}
+              <RatingPill
+                value={media.sourceRating}
+                tone="plain"
+                title={`${media.sourceRatingName} rating`}
+                suffix={<span className="font-normal opacity-70">/ 10 {media.sourceRatingName}</span>}
+              />
+              <BroadcastPill media={media} variant="hero" />
             </div>
 
             <h1 className="mt-3 text-3xl font-extrabold leading-tight tracking-tight text-fg sm:text-5xl">

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import PosterLink from '../ui/PosterLink';
 import { Link } from 'react-router-dom';
 import { Heart, RefreshCw, Star } from 'lucide-react';
 import PosterImage from '../media/PosterImage';
+import RatingPill from '../cinema/RatingPill';
 import { StatusBadge, CategoryBadge } from '../ui/Badge';
 import ProgressBar, { progressPercent, toneForType } from '../ui/ProgressBar';
 import { TYPE_THEME, STATUS_THEME } from '../ui/theme';
@@ -9,6 +11,7 @@ import { STATUS_META, STATUS_ORDER, RATING_OPTIONS } from './libraryConstants';
 import { TYPE_LABELS, mediaPath } from '../media/mediaUtils';
 import { useMediaPrefetch } from '../../hooks/usePrefetch';
 import { updateLibraryEntry, toApiError } from '../../services/api';
+import { useToast } from '../ui/Toast';
 
 const selectClass =
   'h-8 w-full rounded-lg border border-white/10 bg-white/[0.06] px-2 text-xs text-fg outline-none transition focus:border-accent/60 disabled:opacity-50';
@@ -16,17 +19,22 @@ const selectClass =
 const nextStatus = (status) => STATUS_ORDER[(STATUS_ORDER.indexOf(status) + 1) % STATUS_ORDER.length];
 
 /** Shared quick-change logic: status select, status cycle and rating select. */
-function useQuickChange(entry, onChanged) {
+function useQuickChange(entry, onChanged, onOptimistic, onRevert) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const { toast } = useToast();
   const change = async (changes) => {
     setBusy(true);
     setError(null);
+    onOptimistic?.(entry.id, changes); // the card updates (or leaves the filtered list) right away
     try {
       await updateLibraryEntry(entry.id, changes);
       onChanged();
     } catch (err) {
-      setError(toApiError(err)?.message ?? 'Update failed.');
+      onRevert?.(entry.id, changes);
+      const message = toApiError(err)?.message ?? 'Update failed.';
+      setError(message);
+      toast(`${message} Your change was undone.`);
     } finally {
       setBusy(false);
     }
@@ -82,9 +90,9 @@ function Controls({ entry, busy, change, compact = false }) {
 }
 
 /** Grid card: poster with an illuminated progress line along its bottom edge. */
-export default function LibraryCard({ entry, onChanged }) {
+export default function LibraryCard({ entry, onChanged, onOptimistic, onRevert }) {
   const { media } = entry;
-  const { busy, error, change } = useQuickChange(entry, onChanged);
+  const { busy, error, change } = useQuickChange(entry, onChanged, onOptimistic, onRevert);
   const prefetchHandlers = useMediaPrefetch(media);
   const theme = TYPE_THEME[media.mediaType];
   const hasEpisodes = media.mediaType !== 'MOVIE';
@@ -92,7 +100,7 @@ export default function LibraryCard({ entry, onChanged }) {
   const detailsPath = media.provider && media.externalId ? mediaPath(media) : null;
 
   const poster = (
-    <div className={`relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 shadow-card transition duration-300 group-hover:-translate-y-2 ${theme.hover}`}>
+    <div className={`relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 shadow-card transition-[border-color,box-shadow] duration-300 ${theme.hover}`}>
       <PosterImage
         src={media.posterUrl}
         alt={`${media.title} poster`}
@@ -102,12 +110,7 @@ export default function LibraryCard({ entry, onChanged }) {
       />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/80 to-transparent" />
       <StatusBadge status={entry.status} className="absolute left-2 top-2" />
-      {entry.rating !== null && (
-        <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full border border-white/15 bg-black/55 px-2 py-0.5 text-xs font-bold text-fg backdrop-blur-md">
-          <Star className="h-3 w-3 fill-accent text-accent" aria-hidden="true" />
-          {entry.rating.toFixed(1)}
-        </span>
-      )}
+      {entry.rating !== null && <RatingPill value={entry.rating} title="Your rating" className="absolute right-2 top-2" />}
       {entry.isFavorite && (
         <span className="absolute bottom-3 right-2 rounded-full bg-black/55 p-1.5 backdrop-blur-md" title="Favorite">
           <Heart className="h-3.5 w-3.5 fill-red-500 text-red-500" aria-label="Favorite" />
@@ -124,9 +127,9 @@ export default function LibraryCard({ entry, onChanged }) {
   return (
     <article className="group" aria-label={media.title}>
       {detailsPath ? (
-        <Link to={detailsPath} {...prefetchHandlers} className="block rounded-2xl">
+        <PosterLink to={detailsPath} {...prefetchHandlers}>
           {poster}
-        </Link>
+        </PosterLink>
       ) : (
         poster
       )}
@@ -155,9 +158,9 @@ export default function LibraryCard({ entry, onChanged }) {
 }
 
 /** Dense list row for the list view. */
-export function LibraryRow({ entry, onChanged }) {
+export function LibraryRow({ entry, onChanged, onOptimistic, onRevert }) {
   const { media } = entry;
-  const { busy, error, change } = useQuickChange(entry, onChanged);
+  const { busy, error, change } = useQuickChange(entry, onChanged, onOptimistic, onRevert);
   const prefetchHandlers = useMediaPrefetch(media);
   const theme = TYPE_THEME[media.mediaType];
   const hasEpisodes = media.mediaType !== 'MOVIE';

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toApiError } from '../services/api';
-import { readCache, writeCache, isFresh } from '../lib/queryCache';
+import { readCache, writeCache, isFresh, sameData } from '../lib/queryCache';
 
 /**
  * Debounce a fast-changing value (e.g. what the user is typing).
@@ -59,7 +59,9 @@ export function useApiResource(fetcher, deps, { enabled = true, cacheKey, staleM
       .then((data) => {
         if (controller.signal.aborted) return;
         if (cacheKey) writeCache(cacheKey, data);
-        setState({ data, error: null, loading: false });
+        // Identical to what is already on screen (the usual case for a background refresh):
+        // keep the same object so nothing re-renders and nothing shifts.
+        setState((prev) => ({ data: sameData(prev.data, data) ? prev.data : data, error: null, loading: false }));
       })
       .catch((err) => {
         if (controller.signal.aborted) return;

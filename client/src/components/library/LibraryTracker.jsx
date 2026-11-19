@@ -8,6 +8,7 @@ import Card from '../ui/Card';
 import Modal from '../ui/Modal';
 import { StatusBadge } from '../ui/Badge';
 import { Skeleton } from '../ui/Skeleton';
+import { useToast } from '../ui/Toast';
 import { addToLibrary, updateLibraryEntry, removeFromLibrary, toApiError } from '../../services/api';
 import { R } from '../../services/resources';
 import { useResource } from '../../hooks/useApiResource';
@@ -63,6 +64,7 @@ function NotesDialog({ open, initial, busy, onClose, onSave }) {
 export default function LibraryTracker({ media }) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { openSignIn } = useSignIn();
+  const { toast } = useToast();
   const mediaId = media.catalogId;
   const isMovie = media.mediaType === 'MOVIE';
 
@@ -96,7 +98,25 @@ export default function LibraryTracker({ media }) {
   };
 
   const add = (status) => run(async () => setEntry(await addToLibrary({ mediaId, status })));
-  const patch = (changes) => run(async () => setEntry(await updateLibraryEntry(entry.id, changes)));
+  // Optimistic: the screen changes immediately; the server's answer then replaces it, and a failure undoes it.
+  const patch = async (changes) => {
+    const before = entry;
+    setEntry({ ...before, ...changes });
+    setBusy(true);
+    setError(null);
+    try {
+      setEntry(await updateLibraryEntry(before.id, changes));
+      return true;
+    } catch (err) {
+      setEntry(before);
+      const message = toApiError(err)?.message ?? 'Something went wrong.';
+      setError(message);
+      toast(`${message} Your change was undone.`);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
   const saveNotes = async (notes) => {
     if (await patch({ notes })) setNotesOpen(false);
   };

@@ -41,6 +41,9 @@ Track what you watch, episode by episode, and share a profile you are proud of.
 | 🔒 **Independent privacy**: profile and library visibility are separate switches; notes are never public | ✅ Done |
 | 🖼️ **Profile pictures**: upload from your device (drag and drop, instant preview, auto-crop) to Supabase Storage | ✅ Done |
 | 🏅 **Profile showcase**: featured favorites, milestone badges, viewing mix, poster-tinted banner | ✅ Done |
+| ⚡ **Instant navigation**: stale-while-revalidate cache that survives a page reload, optimistic episode and status updates with rollback toasts | ✅ Done |
+| 🎞️ **Cinema & anime touches**: 35mm sprocket edges, ghost kanji watermarks, broadcast "AIRING" pills, festival-laurel ratings of 8.5 and up | ✅ Done |
+| 🏭 **Production hardening**: rate limiting, strict CSP, production indexes, vendor chunking, deploy configs | ✅ Done |
 | 🎬 **Cinematic Editorial Premium UI**: design system, motion, responsive shell and mobile dock | ✅ Done |
 | 🌐 Followers, social feeds, recommendations | 🛠️ Planned (later phases) |
 
@@ -248,6 +251,77 @@ npm run dev          # backend (nodemon) + frontend together
 
 ---
 
+## 🚢 Deployment
+
+ShowTracker is two small apps plus Supabase: a **static React frontend** (Vercel or Netlify), an **Express API** (Render or Railway) and your **Supabase project** (database, auth, storage).
+
+### Hardening that ships with the API
+
+| Area | What it does |
+|---|---|
+| **Rate limits** (per IP, in-memory) | `/api/media/search` and `/api/media/trending` share **60 requests/min** (protects the TMDB and AniList quotas); `/api/profiles/username-availability` allows **30/min**. Over the limit: HTTP **429**, JSON `{ success:false, error:{ code:"RATE_LIMITED", retryAfterSeconds } }` and a `Retry-After` header. `RateLimit-*` headers are always sent. |
+| **Headers** | Helmet with a strict CSP for a JSON-only server (`default-src 'none'`, `frame-ancestors 'none'`), HSTS, `nosniff`, no `X-Powered-By`, `Referrer-Policy: no-referrer`. |
+| **CORS** | Only `CLIENT_URL` (comma-separate several) plus the local dev origins. |
+| **Shutdown** | On `SIGTERM`/`SIGINT` the server stops accepting requests, drains, ends both database pools and exits 0 (hard stop after 5 s). |
+| **Proxy awareness** | `TRUST_PROXY` (default `1` in production) so the limiter sees the visitor, not the platform proxy. |
+
+The limiter is a dependency-free fixed window kept in memory, which is right for a single instance. If you scale to several instances, move it to a shared store such as Redis.
+
+### 1. Database (Supabase)
+
+1. Run the one-time role script from [Database setup](#database-setup).
+2. Apply migrations from your own machine (this needs `MIGRATION_DATABASE_URL`, which never has to live on the host):
+
+   ```bash
+   npm run db:migrate
+   ```
+
+3. **Storage check:** *Supabase Dashboard → Storage* shows a bucket named `avatars` marked **Public**. Migration 006 creates it; if your role could not, create it by hand (public, 5 MB limit, `image/jpeg`, `image/png`, `image/webp`) and add the four owner-folder policies from the migration.
+
+### 2. Backend on Render (or Railway)
+
+| Setting | Value |
+|---|---|
+| Root directory | `server` |
+| Build command | `npm install` |
+| Start command | `npm start` |
+| Health check path | `/api/health` |
+
+Environment variables (see [`server/.env.example`](server/.env.example)): `NODE_ENV=production`, `CLIENT_URL=https://<your-frontend>.vercel.app`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL` (the restricted `showtracker_app` pooler URI), `TMDB_API_READ_ACCESS_TOKEN`. Render sets `PORT` itself. Do **not** add the service-role key or `MIGRATION_DATABASE_URL`.
+
+### 3. Frontend on Vercel (or Netlify)
+
+| Setting | Value |
+|---|---|
+| Root directory | `client` |
+| Build command | `npm run build` |
+| Output directory | `dist` |
+
+Environment variables (see [`client/.env.example`](client/.env.example)): `VITE_API_URL=https://<your-backend>.onrender.com/api`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_SITE_URL=https://<your-frontend>.vercel.app` so link previews get absolute image URLs.
+
+Single-page routing is already configured: [`client/vercel.json`](client/vercel.json) for Vercel and [`client/public/_redirects`](client/public/_redirects) for Netlify, so deep links such as `/u/yourname` do not 404.
+
+### 4. Wire up sign-in for production
+
+1. **Supabase → Authentication → URL Configuration:** set **Site URL** to `https://<your-frontend>.vercel.app` and add **Redirect URLs** `https://<your-frontend>.vercel.app/**` (keep `http://localhost:5173/**` for local work).
+2. **Google Cloud Console → APIs & Services → Credentials → your OAuth client:**
+   - **Authorized JavaScript origins:** `https://<your-frontend>.vercel.app`
+   - **Authorized redirect URIs:** `https://<YOUR_PROJECT_REF>.supabase.co/auth/v1/callback` (the Supabase callback, **not** your frontend)
+3. Redeploy the frontend after setting its variables (Vite bakes them in at build time).
+
+### 5. Smoke test the live API
+
+```bash
+cd server
+npm run test:smoke      # health, security headers, CORS and rate limiting against the app
+```
+
+Then open `https://<your-backend>.onrender.com/api/health` (expect `"status":"healthy"`), sign in on the frontend, upload an avatar and tick an episode.
+
+> Render's free tier sleeps after inactivity, so the first request after a pause can take about 30 seconds. The app shows its normal loading states while it wakes.
+
+---
+
 ## 🔌 API
 
 All media endpoints are public `GET` requests. Responses look like `{ "success": true, "data": ... }`.
@@ -317,6 +391,7 @@ AniList documents 90 requests/minute (currently degraded to 30). The adapter rea
 | [`004_create_user_library_and_progress.sql`](supabase/migrations/004_create_user_library_and_progress.sql) | `user_library`, `user_episode_progress` (per-user, RLS forced) |
 | [`005_create_public_library_view.sql`](supabase/migrations/005_create_public_library_view.sql) | `public_library_entries` view: the only way visitors read a library (no `notes` column) |
 | [`006_create_avatars_storage.sql`](supabase/migrations/006_create_avatars_storage.sql) | Public `avatars` Storage bucket (5 MB, images only) with owner-folder write policies |
+| [`007_production_performance_indexes.sql`](supabase/migrations/007_production_performance_indexes.sql) | Library `(user_id, status, updated_at DESC)` and `(user_id, updated_at DESC)`, catalog `(source_rating DESC, release_date DESC)`. Episode-progress, season and episode lookups are already covered by their primary/unique keys, so no duplicate indexes were added |
 
 ```mermaid
 erDiagram
@@ -351,7 +426,11 @@ The catalog (including seasons and episodes) is **shared** data: one row per tit
 
 Media types (Anime / Movie / TV Show) are told apart by their label, not by a color.
 
+**Cinema and anime details (tasteful, never loud):** 35mm sprocket perforations on hero banners and dialog headers (`.sprockets`); ghost typography at about 4-5% opacity behind headings (`『物語』` stories on anime sections, `『記録』` chronicles on dashboard and profile, `『書庫』` archive on the library, `FEATURE FILM` and `SCENE 01 · 24FPS` for movies and TV, in a Mincho serif); a soft amber projector bloom on hero backdrops; a monospace broadcast pill (`● AIRING · 12 EPS`, with a pulsing radar dot) on titles that are still releasing; an amber rim light on poster hover; and a festival-laurel rating chip with a twinkling star for ratings of **8.5 and up**. Components live in `client/src/components/cinema/`.
+
 **Texture:** fine film grain, a faint dot matrix and micro grid in hero areas, a single very soft warm light at the top of the page, and neutral frosted-glass panels with a 1px top highlight (`client/src/index.css`: `bg-dots`, `bg-grid`, `mask-radial`, `glass`, `glass-lite`, `sheen`). The only gradients left are black scrims over artwork so titles stay legible.
+
+**Motion (Phase 6):** a sliding pill on every tab group (shared `layoutId`), spring tap feedback on all buttons (`whileTap`), posters that spring up on hover and press in on tap, a pop-and-ping when an episode is ticked, a shimmer and gold confetti when the last episode completes a title, an episode list that collapses with an animated height, route changes that fade and slide, and toast notifications.
 
 **Motion (kept):** staggered entrances, sliding tab and nav indicators, card lift with a slow poster zoom, button press and hover sheen, count-up stat numbers, animated progress fills, circular check pop, a pulsing "live" dot on Watching, modal springs and a floating hero collage. All of it honors `prefers-reduced-motion`.
 
@@ -364,6 +443,8 @@ Reusable primitives in `client/src/components/ui/`: `Button`, `Badge` / `Categor
 The database lives far away (a round trip is ~0.3 s and opening a connection ~2.5 s from some locations), so the app is built to avoid waiting:
 
 - **Instant return visits.** An in-memory stale-while-revalidate cache (`client/src/lib/queryCache.js`) shows the last known data immediately and refreshes it quietly in the background. Changing your library or profile marks private data stale; signing out wipes everything.
+- **Survives a refresh.** Your private data (library, stats, shelves, episode lists) is also mirrored into `sessionStorage`: this tab only, never `localStorage`, wiped on sign-out or account switch, and always revalidated on load. A refreshed Dashboard or Library renders instantly instead of showing skeletons. If the fresh response is identical to what is on screen, nothing re-renders.
+- **Optimistic by default.** Ticking an episode, changing a status or rating, or moving a card between status tabs updates the screen at once; the request follows in the background, and a failure undoes the change and shows a toast.
 - **Prefetch before you click.** Page code is downloaded in idle time after the first paint; hovering (or focusing/touching) a navigation link or poster starts loading its page data too. A hovered title opens in ~150 ms instead of several seconds.
 - **Instant app start.** Your profile (name, avatar, username, privacy flags; never tokens) is remembered in `localStorage`, so a returning signed-in user sees the app immediately while it is confirmed in the background.
 - **Fewer database round trips.** The per-user transaction sends `BEGIN` and the identity claims together and, for reads, does not wait for the closing `COMMIT` (writes always do). A typical read request is about 2x faster.
@@ -377,6 +458,7 @@ The database lives far away (a round trip is ~0.3 s and opening a connection ~2.
 ```bash
 cd server
 npm test            # API + mocked media tests + library and stats/privacy integration tests (needs the database; ~5 min)
+npm run test:smoke  # production smoke: health, security headers, CORS, rate limiting (needs DATABASE_URL)
 npm run test:db     # real-database checks for migration 002 (constraints, grants, upserts)
 npm run test:live   # REAL AniList and TMDB calls + catalog persistence (TMDB needs a token)
 
@@ -405,6 +487,7 @@ taskkill /PID <pid> /F
 ```
 client/src/
   components/{layout,media}   shared UI (cards, tabs, filters, skeletons, header, footer)
+  components/cinema/          ghost watermarks, broadcast pill, festival-laurel rating chip
   components/profile/         avatar uploader, edit-profile dialog, favorites / milestones / viewing mix
   lib/avatarUpload.js         validate, crop, compress and upload avatars to Supabase Storage
   pages/                      Landing, Dashboard, Explore, Trending, MediaDetails, Credits, ...
@@ -431,5 +514,5 @@ Movie and TV data, posters and ratings come from [TMDB](https://www.themoviedb.o
 ---
 
 <div align="center">
-<sub>Built with React, Express and PostgreSQL · Phase 5 complete + profile upgrade</sub>
+<sub>Built with React, Express and PostgreSQL · Phase 6 complete</sub>
 </div>

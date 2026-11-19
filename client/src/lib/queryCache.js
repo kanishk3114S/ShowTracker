@@ -10,8 +10,14 @@
  *   'profile:...' public profile pages (an owner's own page includes their library)
  *   'media:...'   public catalog data (search, trending, details, genres)
  *
- * Privacy: the whole cache is wiped on sign-out, so another person using the same
- * browser can never see the previous user's data. Nothing is written to disk.
+ * Reloads: private 'me:' data is also mirrored into sessionStorage (this tab only, gone when the
+ * tab closes), so even a page refresh shows the library, stats and episode lists instantly while
+ * fresh data loads in the background. Hydrated entries are always treated as stale, so they are
+ * revalidated at once. Public catalog data stays in memory only.
+ *
+ * Privacy: the whole cache (memory AND sessionStorage) is wiped on sign-out or account switch, so
+ * another person using the same browser can never see the previous user's data. Never written to
+ * localStorage, and never anything but API payloads (no tokens).
  */
 const MAX_ENTRIES = 300;
 const HARD_MAX_AGE_MS = 30 * 60 * 1000; // older than this is treated as missing
@@ -19,9 +25,70 @@ const HARD_MAX_AGE_MS = 30 * 60 * 1000; // older than this is treated as missing
 const store = new Map(); // key -> { data, at, stale }
 const inflight = new Map(); // key -> Promise (de-duplicates identical requests)
 
+// ---- sessionStorage mirror (private 'me:' data only; "is this title in my library?" answers are excluded)
+const SS_PREFIX = 'st:q1:';
+const persistable = (key) => key.startsWith('me:') && !key.startsWith('me:check:');
+const ss = () => {
+  try {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage;
+  } catch {
+    return null; // blocked (private mode / disabled storage)
+  }
+};
+function persist(key, entry) {
+  const storage = ss();
+  if (!storage || !persistable(key)) return;
+  const value = JSON.stringify({ data: entry.data, at: entry.at });
+  try {
+    storage.setItem(SS_PREFIX + key, value);
+  } catch {
+    // quota exceeded: make room by dropping every persisted copy, then try once more; otherwise memory only
+    dropPersisted('');
+    try {
+      storage.setItem(SS_PREFIX + key, value);
+    } catch {
+      /* memory cache still works */
+    }
+  }
+}
+function hydrate(key) {
+  const storage = ss();
+  if (!storage || !persistable(key)) return null;
+  try {
+    const raw = storage.getItem(SS_PREFIX + key);
+    if (!raw) return null;
+    const { data, at } = JSON.parse(raw);
+    if (typeof at !== 'number' || Date.now() - at > HARD_MAX_AGE_MS) {
+      storage.removeItem(SS_PREFIX + key);
+      return null;
+    }
+    return { data, at, stale: true }; // shown instantly, but always refreshed in the background
+  } catch {
+    return null;
+  }
+}
+function dropPersisted(prefix) {
+  const storage = ss();
+  if (!storage) return;
+  try {
+    const doomed = [];
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k && k.startsWith(SS_PREFIX + prefix)) doomed.push(k);
+    }
+    doomed.forEach((k) => storage.removeItem(k));
+  } catch {
+    /* ignore */
+  }
+}
+
 export function readCache(key) {
-  const entry = store.get(key);
-  if (!entry) return null;
+  let entry = store.get(key);
+  if (!entry) {
+    entry = hydrate(key);
+    if (!entry) return null;
+    store.set(key, entry);
+  }
   if (Date.now() - entry.at > HARD_MAX_AGE_MS) {
     store.delete(key);
     return null;
@@ -33,8 +100,10 @@ export function readCache(key) {
 }
 
 export function writeCache(key, data) {
+  const entry = { data, at: Date.now(), stale: false };
   store.delete(key);
-  store.set(key, { data, at: Date.now(), stale: false });
+  store.set(key, entry);
+  persist(key, entry);
   while (store.size > MAX_ENTRIES) store.delete(store.keys().next().value);
 }
 
@@ -53,6 +122,7 @@ export function dropPrefix(prefix) {
   for (const key of [...store.keys()]) {
     if (key.startsWith(prefix)) store.delete(key);
   }
+  dropPersisted(prefix);
 }
 
 /**
@@ -68,6 +138,17 @@ export const invalidateUserData = () => {
 export function clearCache() {
   store.clear();
   inflight.clear();
+  dropPersisted('');
+}
+
+/** True when two API payloads are identical, so a background refresh can leave the screen untouched. */
+export function sameData(a, b) {
+  if (a === b) return true;
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
 }
 
 /**

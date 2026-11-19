@@ -96,3 +96,102 @@ test('details prefetching is rate limited so it can never exhaust a provider quo
   const stored = [...Array(140).keys()].filter((i) => cache.readCache(`media:details:tmdb|movie|${i}`)).length;
   assert.ok(stored <= 8, `at most 8 detail prefetches per minute, got ${stored}`);
 });
+
+// ---- sessionStorage mirror (persists private 'me:' data across a page reload in the same tab)
+function installFakeSessionStorage() {
+  const data = new Map();
+  globalThis.sessionStorage = {
+    get length() {
+      return data.size;
+    },
+    key: (i) => [...data.keys()][i] ?? null,
+    getItem: (k) => (data.has(k) ? data.get(k) : null),
+    setItem: (k, v) => void data.set(k, String(v)),
+    removeItem: (k) => void data.delete(k)
+  };
+  return data;
+}
+const removeFakeSessionStorage = () => delete globalThis.sessionStorage;
+
+test('private "me:" data survives a reload (memory wiped) and comes back STALE so it is refreshed', () => {
+  const raw = installFakeSessionStorage();
+  try {
+    cache.writeCache('me:library:a', [{ id: 1 }]);
+    cache.writeCache('me:seasons:m1', { seasons: [] });
+    assert.ok(raw.has('st:q1:me:library:a'), 'library mirrored to sessionStorage');
+
+    // simulate a reload: in-memory store is gone, sessionStorage remains
+    // clearCache would also wipe storage, so emulate the reload by re-reading with an empty memory store:
+    const snapshot = new Map(raw);
+    cache.clearCache();
+    snapshot.forEach((v, k) => raw.set(k, v));
+
+    const hit = cache.readCache('me:library:a');
+    assert.deepEqual(hit.data, [{ id: 1 }], 'rendered instantly from the mirror');
+    assert.equal(cache.isFresh(hit, 60_000), false, 'but revalidated in the background');
+    assert.deepEqual(cache.readCache('me:seasons:m1').data, { seasons: [] });
+  } finally {
+    removeFakeSessionStorage();
+  }
+});
+
+test('public catalog data and "in my library?" answers are never written to sessionStorage', () => {
+  const raw = installFakeSessionStorage();
+  try {
+    cache.writeCache('media:trending:x', { t: 1 });
+    cache.writeCache('me:check:abc', { entry: null });
+    cache.writeCache('profile:bob:|||', { p: 1 });
+    assert.equal(raw.size, 0);
+  } finally {
+    removeFakeSessionStorage();
+  }
+});
+
+test('clearCache (sign-out / account switch) wipes the sessionStorage mirror too', () => {
+  const raw = installFakeSessionStorage();
+  try {
+    cache.writeCache('me:stats', { n: 1 });
+    assert.equal(raw.size, 1);
+    cache.clearCache();
+    assert.equal(raw.size, 0);
+    assert.equal(cache.readCache('me:stats'), null);
+  } finally {
+    removeFakeSessionStorage();
+  }
+});
+
+test('a corrupt or expired mirror entry is ignored, never thrown', () => {
+  const raw = installFakeSessionStorage();
+  try {
+    raw.set('st:q1:me:stats', '{not json');
+    assert.equal(cache.readCache('me:stats'), null);
+    raw.set('st:q1:me:recent', JSON.stringify({ data: [], at: Date.now() - 31 * 60 * 1000 }));
+    assert.equal(cache.readCache('me:recent'), null);
+  } finally {
+    removeFakeSessionStorage();
+  }
+});
+
+test('storage that throws on write (quota/blocked) degrades to memory only', () => {
+  globalThis.sessionStorage = {
+    length: 0,
+    key: () => null,
+    getItem: () => null,
+    setItem: () => {
+      throw new Error('QuotaExceededError');
+    },
+    removeItem: () => {}
+  };
+  try {
+    cache.writeCache('me:stats', { n: 2 });
+    assert.deepEqual(cache.readCache('me:stats').data, { n: 2 });
+  } finally {
+    removeFakeSessionStorage();
+  }
+});
+
+test('sameData: equal payloads are detected so a background refresh does not re-render', () => {
+  assert.equal(cache.sameData({ a: [1, 2] }, { a: [1, 2] }), true);
+  assert.equal(cache.sameData({ a: [1, 2] }, { a: [1, 3] }), false);
+  assert.equal(cache.sameData(null, { a: 1 }), false);
+});

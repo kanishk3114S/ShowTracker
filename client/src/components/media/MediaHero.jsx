@@ -1,10 +1,14 @@
 import React from 'react';
 import PosterImage from './PosterImage';
+import GhostMark from '../cinema/GhostMark';
 
 /**
  * Full-bleed cinematic backdrop that fades into the page background.
  * Uses the title's real backdrop; if there is none, a blurred poster; never invented artwork.
  */
+/** Editorial ghost word per media type (pure texture, 4-5% opacity). */
+export const ghostFor = (media) => (media.mediaType === 'ANIME' ? '『物語』' : media.mediaType === 'MOVIE' ? 'FEATURE FILM' : 'SCENE 01 · 24FPS');
+
 export function HeroBackdrop({ media }) {
   const src = media.backdropUrl || media.posterUrl;
   return (
@@ -22,6 +26,9 @@ export function HeroBackdrop({ media }) {
       <div className="absolute inset-0 bg-gradient-to-t from-ink-base via-ink-base/70 to-ink-base/10" />
       <div className="absolute inset-0 bg-gradient-to-r from-ink-base/70 via-transparent to-ink-base/40" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(9,9,11,0.85)_100%)]" />
+      {/* 35mm projector light: a soft amber anamorphic bloom from the top edge */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(245,158,11,0.12),transparent_70%)]" />
+      <GhostMark text={ghostFor(media)} position="right" className="!right-6 !top-1/3" />
     </div>
   );
 }

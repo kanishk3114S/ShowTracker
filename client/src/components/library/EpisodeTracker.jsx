@@ -1,9 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, CheckCheck, Loader2 } from 'lucide-react';
+import { Check, CheckCheck, ChevronDown, Loader2 } from 'lucide-react';
 import ProviderErrorState from '../media/ProviderErrorState';
 import Button from '../ui/Button';
 import Tabs from '../ui/Tabs';
+import Confetti from '../ui/Confetti';
+import { useToast } from '../ui/Toast';
 import ProgressBar, { progressPercent } from '../ui/ProgressBar';
 import { Skeleton } from '../ui/Skeleton';
 import {
@@ -32,7 +34,10 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
   const { data, error, loading, reload } = useResource(R.seasons(mediaId));
   const [chosenSeason, setChosenSeason] = useState(null);
   const [pending, setPending] = useState(() => new Set());
-  const [actionError, setActionError] = useState(null);
+  const [open, setOpen] = useState(true); // the whole episode list collapses with a height animation
+  const [popped, setPopped] = useState(() => new Set()); // episodes ticked by the user this visit (they get the pop + ping)
+  const [celebration, setCelebration] = useState(0); // bumps each time the last episode gets checked
+  const { toast } = useToast();
   const queue = useRef(Promise.resolve());
 
   const seasons = data?.seasons ?? [];
@@ -45,16 +50,21 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
   const percent = progressPercent(watched, total);
 
   const mark = (key, ids, nextWatched, delta, request) => {
-    onLocalChange(ids, nextWatched, delta); // optimistic
+    onLocalChange(ids, nextWatched, delta); // optimistic: checkbox and progress bar flip instantly
+    if (nextWatched) {
+      setPopped((prev) => new Set([...prev, ...ids]));
+      // the pop/ping is a one-off: forget it shortly after so it never replays when a season is revisited
+      setTimeout(() => setPopped((prev) => new Set([...prev].filter((id) => !ids.includes(id)))), 1000);
+    }
+    if (nextWatched && total > 0 && watched < total && watched + delta >= total) setCelebration((n) => n + 1);
     setPending((prev) => new Set(prev).add(key));
-    setActionError(null);
     queue.current = queue.current.then(async () => {
       try {
         const summary = await request();
         onProgress(summary, ids, nextWatched);
       } catch (err) {
         onLocalChange(ids, !nextWatched, -delta); // roll back
-        setActionError(toApiError(err)?.message ?? 'Could not save that change.');
+        toast(`${toApiError(err)?.message ?? 'Could not save that change.'} Your change was undone.`);
       } finally {
         setPending((prev) => {
           const next = new Set(prev);
@@ -113,14 +123,42 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
 
   return (
     <section className="mt-6" aria-label="Episode tracker">
-      <div className="mb-3 flex items-baseline justify-between gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-wider text-fg-subtle">Episodes</h3>
-        <p className="text-sm tabular-nums text-fg" aria-live="polite">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls="episode-panel"
+          className="inline-flex items-center gap-1.5 rounded-md text-sm font-semibold uppercase tracking-wider text-fg-subtle transition-colors hover:text-fg"
+        >
+          Episodes
+          <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${open ? '' : '-rotate-90'}`} aria-hidden="true" />
+        </button>
+        <p className="font-mono text-sm tabular-nums text-fg" aria-live="polite">
           {total > 0 ? `${watched} / ${total} episodes watched (${percent}%)` : `${watched} watched`}
         </p>
       </div>
-      <ProgressBar value={watched} max={total} label="Episodes watched" className="mb-5" />
+      <div className="relative mb-5">
+        <ProgressBar value={watched} max={total} label="Episodes watched" />
+        {celebration > 0 && (
+          <span key={celebration} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-visible">
+            <span className="absolute inset-y-0 left-0 w-1/3 animate-sheen rounded-full bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+            <Confetti className="!left-full" />
+          </span>
+        )}
+      </div>
 
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            id="episode-panel"
+            key="episode-panel"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            className="-mx-1 overflow-hidden px-1"
+          >
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <Tabs name="episode-seasons" ariaLabel="Seasons" tabs={seasonTabs} value={activeId} onChange={setChosenSeason} />
         <Button
@@ -138,12 +176,6 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
       {season.seasonNumber === 0 && (
         <p className="mb-2 text-xs text-fg-subtle">Specials can be ticked off but do not count toward your progress.</p>
       )}
-      {actionError && (
-        <p role="alert" className="mb-2 rounded-lg border border-vermilion/40 bg-vermilion/10 px-3 py-2 text-xs text-[#ff9b9b]">
-          {actionError}
-        </p>
-      )}
-
       <AnimatePresence mode="wait" initial={false}>
         <motion.ul
           key={season.id}
@@ -174,17 +206,30 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
                       : 'border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.06]'
                   }`}
                 >
-                  <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${
+                  <motion.span
+                    key={isWatched ? 'on' : 'off'}
+                    initial={isWatched && popped.has(episode.id) ? { scale: 0.8 } : false}
+                    animate={{ scale: isWatched && popped.has(episode.id) ? [0.8, 1.25, 1] : 1 }}
+                    transition={{ duration: 0.38, ease: 'easeOut' }}
+                    className={`relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition-colors duration-200 ${
                       isWatched ? 'border-accent bg-accent text-ink-base' : 'border-white/25 text-transparent'
                     }`}
                   >
+                    {isWatched && popped.has(episode.id) && (
+                      <motion.span
+                        aria-hidden="true"
+                        className="absolute inset-0 rounded-full ring-4 ring-emerald-500/20"
+                        initial={{ scale: 1, opacity: 1 }}
+                        animate={{ scale: 2.4, opacity: 0 }}
+                        transition={{ duration: 0.65, ease: 'easeOut' }}
+                      />
+                    )}
                     {busy ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin text-fg" aria-hidden="true" />
                     ) : (
-                      <Check key={String(isWatched)} className={`h-3.5 w-3.5 ${isWatched ? 'animate-check-pop' : ''}`} strokeWidth={3.5} aria-hidden="true" />
+                      <Check className="h-3.5 w-3.5" strokeWidth={3.5} aria-hidden="true" />
                     )}
-                  </span>
+                  </motion.span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm text-fg">
                       <span className="mr-2 tabular-nums text-fg-subtle">{episode.episodeNumber}.</span>
@@ -204,6 +249,9 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
             );
           })}
         </motion.ul>
+      </AnimatePresence>
+          </motion.div>
+        )}
       </AnimatePresence>
     </section>
   );
