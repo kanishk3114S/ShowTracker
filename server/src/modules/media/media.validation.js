@@ -66,6 +66,10 @@ export const detailsParamsSchema = z
     path: ['mediaType']
   });
 
+export const franchiseParamsSchema = z.object({
+  externalId: z.string().regex(/^[1-9]\d{0,8}$/, 'Must be a numeric AniList id.')
+});
+
 export const seasonsParamsSchema = z.object({ mediaId: z.string().uuid('mediaId must be a valid id.') });
 
 export const detailsQuerySchema = z.object({

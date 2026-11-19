@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Check, CheckCheck, ChevronDown, Loader2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Check, CheckCheck, ChevronDown, ExternalLink, Loader2 } from 'lucide-react';
 import ProviderErrorState from '../media/ProviderErrorState';
 import Button from '../ui/Button';
 import Tabs from '../ui/Tabs';
@@ -45,7 +46,9 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
     seasons.find((s) => s.id === chosenSeason)?.id ?? (seasons.find((s) => s.seasonNumber > 0) ?? seasons[0])?.id;
   const season = seasons.find((s) => s.id === activeId);
 
-  const total = entry.totalEpisodes ?? 0;
+  // Total across every regular season (a franchise has several); the entry's own number can lag behind a fresh sync.
+  const seasonsTotal = seasons.reduce((n, s) => (s.seasonNumber > 0 ? n + s.episodes.length : n), 0);
+  const total = seasonsTotal || (entry.totalEpisodes ?? 0);
   const watched = entry.watchedEpisodesCount ?? 0;
   const percent = progressPercent(watched, total);
 
@@ -119,6 +122,10 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
   }
 
   const seasonAllWatched = season.episodes.length > 0 && season.episodes.every((e) => watchedIds.has(e.id));
+  const seasonWatched = season.episodes.filter((e) => watchedIds.has(e.id)).length;
+  const seasonTotal = season.episodes.length;
+  // Anime franchises: every season is one linked AniList entry; its own title is worth showing
+  const isFranchise = seasons.filter((s) => s.seasonNumber > 0).length > 1 && Boolean(season.externalId);
   const seasonTabs = seasons.map((s) => ({ value: s.id, label: s.seasonNumber === 0 ? 'Specials' : `Season ${s.seasonNumber}` }));
 
   return (
@@ -136,6 +143,7 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
         </button>
         <p className="font-mono text-sm tabular-nums text-fg" aria-live="polite">
           {total > 0 ? `${watched} / ${total} episodes watched (${percent}%)` : `${watched} watched`}
+          {seasons.filter((s) => s.seasonNumber > 0).length > 1 && <span className="sr-only"> across all seasons</span>}
         </p>
       </div>
       <div className="relative mb-5">
@@ -172,6 +180,29 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
           Mark season watched
         </Button>
       </div>
+
+      {season.seasonNumber > 0 && seasonTotal > 0 && (
+        <div className="mb-3 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3 py-2.5" aria-label={`Season ${season.seasonNumber} progress`}>
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <p className="min-w-0 truncate text-fg">
+              <span className="font-semibold">Season {season.seasonNumber}</span>
+              {isFranchise && season.name && <span className="ml-2 text-fg-subtle">{season.name}</span>}
+            </p>
+            <p className="shrink-0 font-mono tabular-nums text-fg-muted" aria-live="polite">
+              {seasonWatched} / {seasonTotal} eps
+            </p>
+          </div>
+          <ProgressBar value={seasonWatched} max={seasonTotal} label={`Season ${season.seasonNumber} progress`} size="sm" className="mt-2" />
+          {isFranchise && (
+            <Link
+              to={`/media/anilist/anime/${season.externalId}`}
+              className="mt-2 inline-flex items-center gap-1 text-xs text-fg-subtle transition hover:text-accent"
+            >
+              Open this season's page <ExternalLink className="h-3 w-3" aria-hidden="true" />
+            </Link>
+          )}
+        </div>
+      )}
 
       {season.seasonNumber === 0 && (
         <p className="mb-2 text-xs text-fg-subtle">Specials can be ticked off but do not count toward your progress.</p>

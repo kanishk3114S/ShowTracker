@@ -91,6 +91,7 @@ export function toApiError(err) {
       apiError?.message ||
       (err.response ? 'The request failed.' : 'Could not reach the ShowTracker server. Is the backend running?'),
     retryAfterSeconds: apiError?.details?.retryAfterSeconds ?? null,
+    fieldErrors: Array.isArray(apiError?.details) ? apiError.details : null, // validation problems: [{ field, message }]
     status: err.response?.status ?? null
   };
 }
@@ -191,6 +192,65 @@ export async function markEpisodeUnwatched(entryId, episodeId) {
 export async function markSeasonWatched(entryId, seasonId) {
   const res = await apiClient.post(`/library/${entryId}/seasons/${seasonId}/watched`);
   invalidateUserData();
+  return res.data.data;
+}
+
+// ------------------------------------------------- custom groups (shelves) ----
+
+export async function getLibraryGroups(signal) {
+  const res = await apiClient.get('/library/groups', { signal });
+  return res.data.data;
+}
+
+export async function createLibraryGroup(payload) {
+  const res = await apiClient.post('/library/groups', payload);
+  invalidateUserData();
+  return res.data.data;
+}
+
+export async function updateLibraryGroup(id, payload) {
+  const res = await apiClient.patch(`/library/groups/${encodeURIComponent(id)}`, payload);
+  invalidateUserData();
+  return res.data.data;
+}
+
+export async function deleteLibraryGroup(id) {
+  const res = await apiClient.delete(`/library/groups/${encodeURIComponent(id)}`);
+  invalidateUserData();
+  return res.data.data;
+}
+
+export async function addToLibraryGroup(groupId, libraryEntryId) {
+  const res = await apiClient.post(`/library/groups/${encodeURIComponent(groupId)}/items`, { libraryEntryId });
+  invalidateUserData();
+  return res.data.data;
+}
+
+export async function removeFromLibraryGroup(groupId, libraryEntryId) {
+  const res = await apiClient.delete(
+    `/library/groups/${encodeURIComponent(groupId)}/items/${encodeURIComponent(libraryEntryId)}`
+  );
+  invalidateUserData();
+  return res.data.data;
+}
+
+/** -> { libraryEntryId, groupIds: [] } */
+export async function getEntryGroups(libraryEntryId, signal) {
+  const res = await apiClient.get(`/library/items/${encodeURIComponent(libraryEntryId)}/groups`, { signal });
+  return res.data.data;
+}
+
+// ------------------------------------------------- release radar / franchise ----
+
+/** -> { serverTime, items: [...] } upcoming episodes of the user's WATCHING / PLAN_TO_WATCH titles */
+export async function getUpcomingReleases(signal) {
+  const res = await apiClient.get('/library/upcoming', { signal });
+  return res.data.data;
+}
+
+/** -> { isFranchise, seasonNumber, totalSeasons, root, members } for an AniList anime id */
+export async function getAnimeFranchise(externalId, signal) {
+  const res = await apiClient.get(`/media/franchise/${encodeURIComponent(externalId)}`, { signal });
   return res.data.data;
 }
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import PosterLink from '../ui/PosterLink';
 import { Link } from 'react-router-dom';
-import { Heart, RefreshCw, Star } from 'lucide-react';
+import { FolderPlus, Heart, RefreshCw, Star } from 'lucide-react';
 import PosterImage from '../media/PosterImage';
 import RatingPill from '../cinema/RatingPill';
 import { StatusBadge, CategoryBadge } from '../ui/Badge';
@@ -42,7 +42,7 @@ function useQuickChange(entry, onChanged, onOptimistic, onRevert) {
   return { busy, error, change };
 }
 
-function Controls({ entry, busy, change, compact = false }) {
+function Controls({ entry, busy, change, onGroup, compact = false }) {
   const { media } = entry;
   return (
     <div className={compact ? 'flex w-full items-center gap-1.5' : 'space-y-1.5'}>
@@ -71,26 +71,39 @@ function Controls({ entry, busy, change, compact = false }) {
           <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} aria-hidden="true" />
         </button>
       </div>
-      <select
-        aria-label={`Rating for ${media.title}`}
-        value={entry.rating ?? ''}
-        disabled={busy}
-        onChange={(e) => change({ rating: e.target.value === '' ? null : Number(e.target.value) })}
-        className={`${selectClass} ${compact ? '!w-28 shrink-0' : ''}`}
-      >
-        <option value="">Not rated</option>
-        {RATING_OPTIONS.map((r) => (
-          <option key={r} value={r}>
-            ★ {r.toFixed(1)}
-          </option>
-        ))}
-      </select>
+      <div className={`flex items-center gap-1.5 ${compact ? 'shrink-0' : ''}`}>
+        <select
+          aria-label={`Rating for ${media.title}`}
+          value={entry.rating ?? ''}
+          disabled={busy}
+          onChange={(e) => change({ rating: e.target.value === '' ? null : Number(e.target.value) })}
+          className={`${selectClass} ${compact ? '!w-28 shrink-0' : 'min-w-0 flex-1'}`}
+        >
+          <option value="">Not rated</option>
+          {RATING_OPTIONS.map((r) => (
+            <option key={r} value={r}>
+              ★ {r.toFixed(1)}
+            </option>
+          ))}
+        </select>
+        {onGroup && (
+          <button
+            type="button"
+            onClick={() => onGroup(entry)}
+            aria-label={`Add ${media.title} to a group`}
+            title="Add to group"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.06] text-fg-muted transition hover:border-accent/40 hover:text-accent"
+          >
+            <FolderPlus className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
 /** Grid card: poster with an illuminated progress line along its bottom edge. */
-export default function LibraryCard({ entry, onChanged, onOptimistic, onRevert }) {
+export default function LibraryCard({ entry, onChanged, onOptimistic, onRevert, onGroup }) {
   const { media } = entry;
   const { busy, error, change } = useQuickChange(entry, onChanged, onOptimistic, onRevert);
   const prefetchHandlers = useMediaPrefetch(media);
@@ -145,7 +158,7 @@ export default function LibraryCard({ entry, onChanged, onOptimistic, onRevert }
           </p>
         )}
         <div className="mt-2.5">
-          <Controls entry={entry} busy={busy} change={change} />
+          <Controls entry={entry} busy={busy} change={change} onGroup={onGroup} />
         </div>
         {error && (
           <p role="alert" className="mt-1 text-[11px] text-red-300">
@@ -158,7 +171,7 @@ export default function LibraryCard({ entry, onChanged, onOptimistic, onRevert }
 }
 
 /** Dense list row for the list view. */
-export function LibraryRow({ entry, onChanged, onOptimistic, onRevert }) {
+export function LibraryRow({ entry, onChanged, onOptimistic, onRevert, onGroup }) {
   const { media } = entry;
   const { busy, error, change } = useQuickChange(entry, onChanged, onOptimistic, onRevert);
   const prefetchHandlers = useMediaPrefetch(media);
@@ -211,7 +224,7 @@ export function LibraryRow({ entry, onChanged, onOptimistic, onRevert }) {
       </div>
       <div className="flex items-center gap-2">
         <span className={`hidden h-2 w-2 shrink-0 rounded-full sm:block ${status.dot}`} aria-hidden="true" />
-        <Controls entry={entry} busy={busy} change={change} compact />
+        <Controls entry={entry} busy={busy} change={change} onGroup={onGroup} compact />
       </div>
       {error && (
         <p role="alert" className="text-[11px] text-red-300 md:col-span-3">

@@ -5,6 +5,11 @@ import Container from '../../components/layout/Container';
 import PageHeader from '../../components/layout/PageHeader';
 import LibraryCard, { LibraryRow } from '../../components/library/LibraryCard';
 import LibraryFilters, { SORTS } from '../../components/library/LibraryFilters';
+import GroupStrip from '../../components/library/GroupStrip';
+import GroupModal from '../../components/library/GroupModal';
+import GroupPicker from '../../components/library/GroupPicker';
+import ReleaseRadar from '../../components/dashboard/ReleaseRadar';
+import Tabs from '../../components/ui/Tabs';
 import ProviderErrorState from '../../components/media/ProviderErrorState';
 import EmptyState from '../../components/media/EmptyState';
 import Button from '../../components/ui/Button';
@@ -39,6 +44,8 @@ export default function Library() {
   const mediaType = ['ANIME', 'MOVIE', 'TV'].includes(params.get('type')) ? params.get('type') : '';
   const sortKey = SORTS[params.get('sort')] ? params.get('sort') : 'recent';
   const { sort, order } = SORTS[sortKey];
+  const section = params.get('view') === 'radar' ? 'radar' : 'titles';
+  const groupParam = params.get('group') || '';
 
   const update = (changes) =>
     setParams(
@@ -50,7 +57,12 @@ export default function Library() {
       { replace: true }
     );
 
-  const { data, error, loading, reload } = useResource(R.library({ status, mediaType, sort, order }));
+  const groups = useResource(R.groups());
+  // An unknown/deleted group id in the URL is ignored once the group list is known.
+  const groupId = groupParam && (!groups.data || groups.data.some((g) => g.id === groupParam)) ? groupParam : '';
+  const activeGroup = groups.data?.find((g) => g.id === groupId) ?? null;
+
+  const { data, error, loading, reload } = useResource(R.library({ status, mediaType, sort, order, groupId }));
   const stats = useResource(R.stats());
   const counts = useMemo(() => (stats.data ? { total: stats.data.totalItems, byStatus: stats.data.byStatus } : null), [stats.data]);
 
@@ -86,10 +98,18 @@ export default function Library() {
         .filter((e) => !status || e.status === status),
     [data, overrides, status]
   );
-  const filtered = Boolean(status || mediaType);
+  const filtered = Boolean(status || mediaType || groupId);
   const onChanged = () => {
     reload();
     stats.reload();
+  };
+
+  // Custom groups: create / edit dialog and the per-title "Add to group" picker
+  const [groupDialog, setGroupDialog] = useState({ open: false, group: null });
+  const [pickerEntry, setPickerEntry] = useState(null);
+  const refreshAfterGroupChange = () => {
+    groups.reload();
+    reload();
   };
 
   return (
@@ -102,7 +122,18 @@ export default function Library() {
         watermark="『書庫』"
       />
 
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <Tabs
+          name="library-view"
+          ariaLabel="Library sections"
+          tabs={[
+            { value: 'titles', label: 'My titles' },
+            { value: 'radar', label: 'Release Radar' }
+          ]}
+          value={section}
+          onChange={(v) => update({ view: v === 'radar' ? 'radar' : '' })}
+        />
+        {section === 'titles' && (
         <div role="group" aria-label="Library view" className="glass-lite inline-flex rounded-xl p-1">
           {[
             ['grid', LayoutGrid, 'Grid view'],
@@ -122,14 +153,29 @@ export default function Library() {
             </button>
           ))}
         </div>
+        )}
       </div>
 
+      {section === 'radar' ? (
+        <ReleaseRadar />
+      ) : (
+      <>
       <LibraryFilters
         status={status}
         mediaType={mediaType}
         sortKey={sortKey}
         counts={counts}
         onChange={(changes) => update(changes)}
+      />
+
+      <GroupStrip
+        groups={groups.data}
+        loading={groups.loading}
+        value={groupId}
+        totalCount={counts?.total}
+        onChange={(id) => update({ group: id })}
+        onCreate={() => setGroupDialog({ open: true, group: null })}
+        onEdit={(group) => setGroupDialog({ open: true, group })}
       />
 
       <div className="mt-8">
@@ -142,7 +188,13 @@ export default function Library() {
             icon={LibraryIcon}
             watermark="『書庫』"
             title={filtered ? 'No titles here' : 'Your library is empty'}
-            message={filtered ? (EMPTY_COPY[status] ?? 'No titles match these filters.') : EMPTY_COPY['']}
+            message={
+              groupId && !status && !mediaType
+                ? 'This group is empty. Use the folder button on any title to add it.'
+                : filtered
+                  ? (EMPTY_COPY[status] ?? 'No titles match these filters.')
+                  : EMPTY_COPY['']
+            }
             action={
               <Button as={Link} to="/explore" variant="primary" leftIcon={Compass}>
                 Explore titles
@@ -158,15 +210,32 @@ export default function Library() {
             {entries.map((entry) => (
               <StaggerItem key={entry.id}>
                 {view === 'grid' ? (
-                  <LibraryCard entry={entry} onChanged={onChanged} onOptimistic={onOptimistic} onRevert={onRevert} />
+                  <LibraryCard entry={entry} onChanged={onChanged} onOptimistic={onOptimistic} onRevert={onRevert} onGroup={setPickerEntry} />
                 ) : (
-                  <LibraryRow entry={entry} onChanged={onChanged} onOptimistic={onOptimistic} onRevert={onRevert} />
+                  <LibraryRow entry={entry} onChanged={onChanged} onOptimistic={onOptimistic} onRevert={onRevert} onGroup={setPickerEntry} />
                 )}
               </StaggerItem>
             ))}
           </Stagger>
         )}
       </div>
+      </>
+      )}
+
+      <GroupModal
+        open={groupDialog.open}
+        group={groupDialog.group}
+        onClose={() => setGroupDialog((d) => ({ ...d, open: false }))}
+        onSaved={(saved) => {
+          if (!groupDialog.group) update({ group: saved.id }); // a new group is selected straight away
+          refreshAfterGroupChange();
+        }}
+        onDeleted={(deleted) => {
+          if (deleted.id === groupId) update({ group: '' });
+          refreshAfterGroupChange();
+        }}
+      />
+      <GroupPicker open={Boolean(pickerEntry)} entry={pickerEntry} onClose={() => setPickerEntry(null)} onChanged={refreshAfterGroupChange} />
     </Container>
   );
 }

@@ -64,6 +64,7 @@ if (process.env.NODE_ENV !== 'test') {
 // Abuse protection for routes that spend provider quota or reveal account names (429 + Retry-After)
 app.use('/api/media/search', mediaDiscoveryLimiter);
 app.use('/api/media/trending', mediaDiscoveryLimiter);
+app.use('/api/media/franchise', mediaDiscoveryLimiter);
 app.use('/api/profiles/username-availability', usernameCheckLimiter);
 
 // API Routes

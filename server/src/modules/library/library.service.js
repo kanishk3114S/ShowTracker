@@ -90,7 +90,7 @@ async function fetchEntry(client, userId, entryId) {
   return mapEntry(rows[0]);
 }
 
-export async function listLibrary(client, userId, { status, mediaType, sort, order, limit = 500 }) {
+export async function listLibrary(client, userId, { status, mediaType, sort, order, groupId, limit = 500 }) {
   const where = ['ul.user_id = $1'];
   const params = [userId];
   if (status) {
@@ -100,6 +100,13 @@ export async function listLibrary(client, userId, { status, mediaType, sort, ord
   if (mediaType) {
     params.push(mediaType);
     where.push(`mi.media_type = $${params.length}`);
+  }
+  if (groupId) {
+    // Only the caller's own group can match: RLS hides other users' links, and the entry is already user-scoped.
+    params.push(groupId);
+    where.push(
+      `EXISTS (SELECT 1 FROM public.library_group_items gi WHERE gi.group_id = $${params.length} AND gi.library_entry_id = ul.id)`
+    );
   }
   const direction = order === 'asc' ? 'ASC' : 'DESC';
   const orderBy = `${SORTS[sort] ?? SORTS.updated_at} ${direction} NULLS LAST, ul.updated_at DESC`;

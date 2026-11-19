@@ -32,7 +32,7 @@ const LIST_FIELDS = `
 const DETAIL_FIELDS = `
   ${LIST_FIELDS}
   duration
-  nextAiringEpisode { episode }
+  nextAiringEpisode { episode airingAt timeUntilAiring }
   endDate { year month day }
   studios(isMain: true) { nodes { name } }
   relations {
@@ -61,6 +61,51 @@ const DETAIL_QUERY = `
   query ($id: Int) {
     Media(id: $id, type: ANIME) {
       ${DETAIL_FIELDS}
+    }
+  }
+`;
+
+// One franchise member: its own facts plus the relations that point to its prequel/sequel.
+const FRANCHISE_QUERY = `
+  query ($id: Int) {
+    Media(id: $id, type: ANIME) {
+      id
+      format
+      status
+      episodes
+      duration
+      title { romaji english native }
+      coverImage { extraLarge large }
+      startDate { year month day }
+      nextAiringEpisode { episode airingAt timeUntilAiring }
+      relations {
+        edges {
+          relationType(version: 2)
+          node {
+            id
+            type
+            format
+            status
+            episodes
+            title { romaji english }
+            startDate { year month day }
+          }
+        }
+      }
+    }
+  }
+`;
+
+// Next-episode data for many titles in ONE request (Release Radar refresh).
+const AIRING_QUERY = `
+  query ($ids: [Int], $perPage: Int) {
+    Page(page: 1, perPage: $perPage) {
+      media(id_in: $ids, type: ANIME) {
+        id
+        status
+        episodes
+        nextAiringEpisode { episode airingAt timeUntilAiring }
+      }
     }
   }
 `;
@@ -175,6 +220,21 @@ export async function getAnimeDetails(id) {
   const data = await graphql(DETAIL_QUERY, { id: Number(id) });
   if (!data?.Media) throw new ProviderError(PROVIDER, 'NOT_FOUND');
   return data.Media;
+}
+
+/** A title plus its relations, for walking prequel/sequel chains (franchise linking). */
+export async function getAnimeFranchiseNode(id) {
+  const data = await graphql(FRANCHISE_QUERY, { id: Number(id) });
+  if (!data?.Media) throw new ProviderError(PROVIDER, 'NOT_FOUND');
+  return data.Media;
+}
+
+/** `status` and `nextAiringEpisode` for up to 50 anime ids in a single request. */
+export async function getAnimeAiringBatch(ids) {
+  const list = [...new Set(ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 50);
+  if (list.length === 0) return [];
+  const data = await graphql(AIRING_QUERY, { ids: list, perPage: list.length });
+  return data?.Page?.media ?? [];
 }
 
 /** Genre names supported by AniList's `genre` filter. */

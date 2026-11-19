@@ -6,6 +6,7 @@ import Button from '../../components/ui/Button';
 import Avatar from '../../components/ui/Avatar';
 import { Reveal, Stagger } from '../../components/ui/motion';
 import GhostMark from '../../components/cinema/GhostMark';
+import ReleaseRadar from '../../components/dashboard/ReleaseRadar';
 import { Skeleton } from '../../components/ui/Skeleton';
 import StatCard from '../../components/dashboard/StatCard';
 import ContinueWatchingShelf from '../../components/dashboard/ContinueWatchingShelf';
@@ -173,6 +174,8 @@ export default function Dashboard() {
               />
             ) : (
               <>
+                <ReleaseRadar compact />
+
                 <section aria-label="Continue watching">
                   <SectionHeading title="Continue watching" subtitle="Pick up exactly where you left off." to="/library?status=WATCHING" linkLabel="View all" />
                   {shelf.data?.length ? (

@@ -114,6 +114,14 @@ export function normalizeAniListMedia(raw) {
 
   // Detail-only extras (present only when the detail query was used).
   if (raw.endDate !== undefined) media.endDate = normalizeFuzzyDate(raw.endDate);
+  // Next episode (Release Radar): airingAt is unix seconds, exact to the minute.
+  if (raw.nextAiringEpisode !== undefined) {
+    const next = raw.nextAiringEpisode;
+    media.nextAiring =
+      next && Number.isFinite(next.airingAt) && Number.isInteger(next.episode)
+        ? { episode: next.episode, airingAt: next.airingAt }
+        : null;
+  }
   if (raw.studios) media.studios = raw.studios.nodes?.map((s) => s.name).filter(Boolean) ?? [];
   if (raw.relations) {
     media.relations = (raw.relations.edges ?? [])
@@ -191,6 +199,14 @@ export function normalizeTmdbMedia(raw, mediaType, genreMap = new Map()) {
 
   if (raw.tagline !== undefined) media.tagline = nullIfBlank(raw.tagline);
   if (!isMovie && raw.last_air_date !== undefined) media.endDate = normalizeIsoDate(raw.last_air_date);
+  // Next episode (Release Radar): TMDB gives a calendar date only, no hour.
+  if (!isMovie && raw.next_episode_to_air !== undefined) {
+    const next = raw.next_episode_to_air;
+    const airDate = normalizeIsoDate(next?.air_date);
+    media.nextEpisode = next && airDate
+      ? { airDate, episode: positiveIntOrNull(next.episode_number), season: Number.isInteger(next.season_number) ? next.season_number : null }
+      : null;
+  }
   return media;
 }
 

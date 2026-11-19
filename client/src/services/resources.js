@@ -9,7 +9,11 @@ import {
   getContinueWatching,
   getRecentlyUpdated,
   getPublicProfile,
-  checkLibraryEntry
+  checkLibraryEntry,
+  getLibraryGroups,
+  getEntryGroups,
+  getUpcomingReleases,
+  getAnimeFranchise
 } from './api';
 import { prefetch } from '../lib/queryCache';
 
@@ -31,11 +35,15 @@ export const R = {
   stats: () => ({ key: 'me:stats', staleMs: ME_STALE, fetch: (s) => getLibraryStats(s) }),
   continueWatching: () => ({ key: 'me:continue', staleMs: ME_STALE, fetch: (s) => getContinueWatching(s) }),
   recentlyUpdated: () => ({ key: 'me:recent', staleMs: ME_STALE, fetch: (s) => getRecentlyUpdated(s) }),
-  library: ({ status = '', mediaType = '', sort = 'updated_at', order = 'desc' } = {}) => ({
-    key: `me:library:${k(status, mediaType, sort, order)}`,
+  library: ({ status = '', mediaType = '', sort = 'updated_at', order = 'desc', groupId = '' } = {}) => ({
+    key: `me:library:${k(status, mediaType, sort, order, groupId)}`,
     staleMs: ME_STALE,
-    fetch: (s) => getMyLibrary({ status, mediaType, sort, order }, s)
+    fetch: (s) => getMyLibrary({ status, mediaType, sort, order, groupId }, s)
   }),
+  groups: () => ({ key: 'me:groups', staleMs: ME_STALE, fetch: (s) => getLibraryGroups(s) }),
+  entryGroups: (entryId) => ({ key: `me:entrygroups:${entryId}`, staleMs: ME_STALE, fetch: (s) => getEntryGroups(entryId, s) }),
+  // Airing data changes slowly: 15 minutes fresh, stale-while-revalidate after that
+  upcoming: () => ({ key: 'me:upcoming', staleMs: 15 * 60_000, fetch: (s) => getUpcomingReleases(s) }),
   checkEntry: (mediaId) => ({ key: `me:check:${mediaId}`, staleMs: ME_STALE, fetch: (s) => checkLibraryEntry(mediaId, s) }),
   seasons: (mediaId) => ({ key: `me:seasons:${mediaId}`, staleMs: 10 * 60_000, fetch: (s) => getMediaSeasons(mediaId, s) }),
 
@@ -57,6 +65,11 @@ export const R = {
     key: `media:trending:${k(type, window, page)}`,
     staleMs: MEDIA_STALE,
     fetch: (s) => getTrendingMedia({ type, window, page }, s)
+  }),
+  franchise: (externalId) => ({
+    key: `media:franchise:${externalId}`,
+    staleMs: 30 * 60_000,
+    fetch: (s) => getAnimeFranchise(externalId, s)
   }),
   details: ({ provider, mediaType, externalId }) => ({
     key: `media:details:${k(String(provider).toLowerCase(), String(mediaType).toLowerCase(), externalId)}`,

@@ -38,7 +38,8 @@ export const listLibraryQuerySchema = z.object({
   status: z.preprocess(emptyToUndefined, z.enum(LIBRARY_STATUSES).optional()),
   mediaType: z.preprocess(emptyToUndefined, z.enum(['ANIME', 'MOVIE', 'TV']).optional()),
   sort: z.preprocess(emptyToUndefined, z.enum(['updated_at', 'title', 'rating', 'release_date']).default('updated_at')),
-  order: z.preprocess(emptyToUndefined, z.enum(['asc', 'desc']).default('desc'))
+  order: z.preprocess(emptyToUndefined, z.enum(['asc', 'desc']).default('desc')),
+  groupId: z.preprocess(emptyToUndefined, uuid.optional())
 });
 
 export const entryParamsSchema = z.object({ id: uuid });

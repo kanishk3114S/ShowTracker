@@ -5,6 +5,7 @@ import Container from '../../components/layout/Container';
 import { HeroBackdrop, HeroPoster } from '../../components/media/MediaHero';
 import RatingPill from '../../components/cinema/RatingPill';
 import BroadcastPill from '../../components/cinema/BroadcastPill';
+import FranchiseBadge from '../../components/media/FranchiseBadge';
 import GenreBadges from '../../components/media/GenreBadges';
 import PosterImage from '../../components/media/PosterImage';
 import ProviderErrorState from '../../components/media/ProviderErrorState';
@@ -113,6 +114,7 @@ export default function MediaDetails() {
             </h1>
             {media.originalTitle && <p className="mt-1.5 text-sm text-fg-muted">{media.originalTitle}</p>}
             {media.tagline && <p className="mt-3 text-sm italic text-fg-muted">{media.tagline}</p>}
+            <FranchiseBadge media={media} />
 
             <div className="mt-5">
               <GenreBadges genres={media.genres} mediaType={media.mediaType} />

@@ -40,9 +40,9 @@ export function prefetchRoute(pathname) {
 /** Start loading the default data a route shows first. Private data only when signed in. */
 export function prefetchRouteData(pathname, isAuthenticated) {
   if (pathname.startsWith('/dashboard') && isAuthenticated) {
-    [R.stats(), R.continueWatching(), R.recentlyUpdated()].forEach(prefetchResource);
+    [R.stats(), R.continueWatching(), R.recentlyUpdated(), R.upcoming()].forEach(prefetchResource);
   } else if (pathname.startsWith('/library') && isAuthenticated) {
-    [R.library(), R.stats()].forEach(prefetchResource);
+    [R.library(), R.stats(), R.groups()].forEach(prefetchResource);
   } else if (pathname.startsWith('/explore')) {
     [R.search(), R.genres('ALL')].forEach(prefetchResource);
   } else if (pathname.startsWith('/trending')) {

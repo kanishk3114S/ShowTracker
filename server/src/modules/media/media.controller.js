@@ -6,8 +6,10 @@ import {
   getGenreOptions
 } from '../../services/mediaCatalog.service.js';
 import { getSeasonsForMedia } from '../../services/episodeCatalog.service.js';
+import { getFranchiseSummary } from '../../services/franchise.service.js';
 import {
   seasonsParamsSchema,
+  franchiseParamsSchema,
   searchQuerySchema,
   trendingQuerySchema,
   genresQuerySchema,
@@ -68,6 +70,17 @@ export async function seasons(req, res, next) {
     const { mediaId } = parseOrThrow(seasonsParamsSchema, req.params, 'Invalid media id.');
     const data = await getSeasonsForMedia(mediaId);
     res.set('Cache-Control', 'private, no-store').json({ success: true, data });
+  } catch (err) {
+    next(withRetryHeader(res, err));
+  }
+}
+
+/** Is this anime one season of a longer series (and which one)? Public, derived from AniList relations. */
+export async function franchise(req, res, next) {
+  try {
+    const { externalId } = parseOrThrow(franchiseParamsSchema, req.params, 'Invalid anime id.');
+    const data = await getFranchiseSummary(externalId);
+    res.set('Cache-Control', 'public, max-age=300').json({ success: true, data });
   } catch (err) {
     next(withRetryHeader(res, err));
   }

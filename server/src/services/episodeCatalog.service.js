@@ -1,21 +1,18 @@
 import { pool } from '../config/database.js';
 import { AppError } from '../middleware/errorHandler.js';
 import * as tmdb from '../providers/tmdb.provider.js';
-import * as anilist from '../providers/anilist.provider.js';
-import {
-  normalizeTmdbSeason,
-  normalizeTmdbEpisode,
-  buildAnimeEpisodes,
-  anilistKnownEpisodeCount
-} from './mediaNormalizer.js';
+import { normalizeTmdbSeason, normalizeTmdbEpisode } from './mediaNormalizer.js';
+import { planAnimeSeasons, SEASON_SOURCE_PREFIX } from './franchise.service.js';
 
 /**
  * Seasons and episodes are shared catalog data. They are loaded from the
  * provider the first time someone needs them and then reused by every user.
  *
  *   TV    -> TMDB seasons + per-season episode lists
- *   ANIME -> AniList has no per-episode data, so Season 1 with episodes 1..N is
- *            generated from the episode count (or episodes already aired)
+ *   ANIME -> AniList has no per-episode data, so episodes 1..N are generated from the
+ *            episode count (or episodes already aired). Sequels are linked into ONE
+ *            series: the first season of a franchise gets Season 1, 2, 3 ... (one
+ *            season per linked AniList entry, see franchise.service.js)
  *   MOVIE -> never has seasons or episodes
  *
  * Syncing is idempotent (UPSERTs) and NEVER deletes: removing an episode would
@@ -24,6 +21,10 @@ import {
 const MAX_SEASONS = 60;
 const SEASON_FETCH_CONCURRENCY = 4;
 const STALE_AFTER_MS = 12 * 60 * 60 * 1000;
+// A finished anime can still gain a new sequel, so its franchise is re-checked now and then.
+const ENDED_ANIME_RECHECK_MS = 7 * 24 * 60 * 60 * 1000;
+const UPGRADE_RETRY_MS = 10 * 60 * 1000;
+const failedUpgrades = new Map(); // mediaId -> time a franchise upgrade last failed (bounded below)
 const ENDED_STATUSES = new Set(['Ended', 'Canceled', 'FINISHED', 'CANCELLED']);
 
 const EMPTY_RETRY_MS = 10 * 60 * 1000;
@@ -70,22 +71,8 @@ async function fetchPlan(source) {
     });
   }
 
-  // ANIME
-  const raw = await anilist.getAnimeDetails(source.external_id);
-  const count = anilistKnownEpisodeCount(raw);
-  if (!count) return []; // nothing reliable to generate yet
-  const episodes = buildAnimeEpisodes(count, raw.duration);
-  return [
-    {
-      seasonNumber: 1,
-      name: 'Season 1',
-      overview: null,
-      posterUrl: null,
-      airDate: null,
-      episodeCount: episodes.length,
-      episodes
-    }
-  ];
+  // ANIME: Season 1..N from the franchise chain (a single season for a standalone title or a lone sequel)
+  return planAnimeSeasons(source.external_id); // [] while no episode count is reliable yet
 }
 
 async function persistPlan(mediaId, plan, db) {
@@ -177,7 +164,9 @@ async function readSeasons(mediaId, db) {
         id: r.season_id,
         seasonNumber: r.season_number,
         name: r.season_name,
-        overview: r.season_overview,
+        // Anime seasons keep the AniList id of their entry in `overview` (internal marker, never shown)
+        overview: r.season_overview?.startsWith(SEASON_SOURCE_PREFIX) ? null : r.season_overview,
+        externalId: r.season_overview?.startsWith(SEASON_SOURCE_PREFIX) ? r.season_overview.slice(SEASON_SOURCE_PREFIX.length) : null,
         posterUrl: r.poster_path,
         airDate: r.season_air_date ? toDateString(r.season_air_date) : null,
         episodeCount: r.episode_count,
@@ -199,6 +188,10 @@ async function readSeasons(mediaId, db) {
   return { seasons: [...seasons.values()], newestUpdate };
 }
 
+/** Anime stored before franchise linking have no AniList marker on their seasons: sync them once more. */
+const isLegacyAnime = (source, seasons) =>
+  source.media_type === 'ANIME' && source.provider === 'ANILIST' && seasons.length > 0 && seasons.every((s) => !s.externalId);
+
 // pg returns DATE columns as local-midnight JS Dates; format without a timezone shift.
 function toDateString(date) {
   const d = new Date(date);
@@ -219,12 +212,16 @@ export async function getSeasonsForMedia(mediaId, db = pool) {
 
   let { seasons, newestUpdate } = await readSeasons(mediaId, db);
   const status = source.metadata?.status;
-  const stale = seasons.length > 0 && Date.now() - newestUpdate > STALE_AFTER_MS && !ENDED_STATUSES.has(status);
+  const age = Date.now() - newestUpdate;
+  const ended = ENDED_STATUSES.has(status);
+  const isAnilistAnime = source.media_type === 'ANIME' && source.provider === 'ANILIST';
+  const stale = seasons.length > 0 && (ended ? isAnilistAnime && age > ENDED_ANIME_RECHECK_MS : age > STALE_AFTER_MS);
+  const legacy = isLegacyAnime(source, seasons) && Date.now() - (failedUpgrades.get(mediaId) ?? 0) > UPGRADE_RETRY_MS;
 
   // A title the provider has no episode data for yet is not re-requested on every page view.
   const recentlyEmpty = Date.now() - (emptySyncs.get(mediaId) ?? 0) < EMPTY_RETRY_MS;
 
-  if ((seasons.length === 0 && !recentlyEmpty) || stale) {
+  if ((seasons.length === 0 && !recentlyEmpty) || stale || legacy) {
     try {
       await syncSeasonsAndEpisodes(mediaId, db);
       ({ seasons } = await readSeasons(mediaId, db));
@@ -233,6 +230,10 @@ export async function getSeasonsForMedia(mediaId, db = pool) {
         emptySyncs.set(mediaId, Date.now());
       }
     } catch (err) {
+      if (legacy) {
+        if (failedUpgrades.size >= 1000) failedUpgrades.delete(failedUpgrades.keys().next().value);
+        failedUpgrades.set(mediaId, Date.now());
+      }
       if (seasons.length === 0) throw err;
       console.warn(`[Episodes] Refresh failed for ${mediaId}, serving stored data:`, err.message);
     }

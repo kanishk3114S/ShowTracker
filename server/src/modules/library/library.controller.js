@@ -2,6 +2,7 @@ import { AppError } from '../../middleware/errorHandler.js';
 import { withUserTransaction } from '../../db/withUserTransaction.js';
 import * as service from './library.service.js';
 import { getOwnerStats } from './library.stats.js';
+import { getUpcoming } from './radar.service.js';
 import {
   addLibrarySchema,
   updateLibrarySchema,
@@ -12,7 +13,7 @@ import {
   seasonParamsSchema
 } from './library.validation.js';
 
-function parse(schema, input, message = 'Validation failed.') {
+export function parse(schema, input, message = 'Validation failed.') {
   const result = schema.safeParse(input);
   if (!result.success) {
     const details = result.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
@@ -22,7 +23,7 @@ function parse(schema, input, message = 'Validation failed.') {
 }
 
 /** Wraps a handler: parse -> run inside the user's transaction -> JSON, errors to the central handler. */
-const handler = (run, status = 200, { readOnly = false } = {}) => async (req, res, next) => {
+export const handler = (run, status = 200, { readOnly = false } = {}) => async (req, res, next) => {
   try {
     const data = await withUserTransaction(req.user.id, (client) => run(client, req), { readOnly });
     // Library data is private: never let shared caches keep it.
@@ -78,6 +79,20 @@ export const markSeason = handler((client, req) => {
 const SHELF_SIZE = 10;
 
 export const stats = handler((client, req) => getOwnerStats(client, req.user.id), 200, { readOnly: true });
+
+/**
+ * Release Radar: upcoming episodes of the user's WATCHING / PLAN_TO_WATCH anime and TV, soonest first.
+ * Not wrapped in `handler`: stale airing data is refreshed from the providers (catalog writes) after the
+ * user's read-only transaction has ended.
+ */
+export const upcoming = async (req, res, next) => {
+  try {
+    const data = await getUpcoming(req.user.id);
+    res.set('Cache-Control', 'private, no-store').json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const continueWatching = handler(
   (client, req) =>

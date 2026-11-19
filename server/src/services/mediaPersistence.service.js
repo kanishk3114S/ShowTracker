@@ -30,7 +30,13 @@ export async function upsertMediaFromDetails(media, db = pool) {
     releaseYear: media.releaseYear ?? null,
     endDate: media.endDate ?? null,
     sourceRatingName: media.sourceRatingName ?? null,
-    sourceUrl: media.sourceUrl ?? null
+    sourceUrl: media.sourceUrl ?? null,
+    // Release Radar: next episode (AniList: unix seconds; TMDB: calendar date)
+    nextAiring: media.nextAiring?.airingAt ?? null,
+    nextAiringEpisode: media.nextAiring?.episode ?? null,
+    nextAirDate: media.nextEpisode?.airDate ?? null,
+    nextAirEpisode: media.nextEpisode?.episode ?? null,
+    nextAirSeason: media.nextEpisode?.season ?? null
   };
 
   const client = await db.connect();

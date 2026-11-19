@@ -27,7 +27,7 @@ const inflight = new Map(); // key -> Promise (de-duplicates identical requests)
 
 // ---- sessionStorage mirror (private 'me:' data only; "is this title in my library?" answers are excluded)
 const SS_PREFIX = 'st:q1:';
-const persistable = (key) => key.startsWith('me:') && !key.startsWith('me:check:');
+const persistable = (key) => key.startsWith('me:') && !key.startsWith('me:check:') && !key.startsWith('me:entrygroups:');
 const ss = () => {
   try {
     return typeof sessionStorage === 'undefined' ? null : sessionStorage;
@@ -132,6 +132,7 @@ export function dropPrefix(prefix) {
  */
 export const invalidateUserData = () => {
   dropPrefix('me:check:');
+  dropPrefix('me:entrygroups:');
   markStale(['me:', 'profile:']);
 };
 

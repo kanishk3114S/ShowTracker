@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Heart, LogIn, NotebookPen, Plus, Star, Trash2 } from 'lucide-react';
+import { Check, FolderPlus, Heart, LogIn, NotebookPen, Plus, Star, Trash2 } from 'lucide-react';
 import { STATUS_THEME } from '../ui/theme';
 import EpisodeTracker from './EpisodeTracker';
+import GroupPicker from './GroupPicker';
 import { STATUS_META, STATUS_ORDER, RATING_OPTIONS, NOTES_MAX, fieldClass } from './libraryConstants';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
@@ -75,6 +76,7 @@ export default function LibraryTracker({ media }) {
   const [error, setError] = useState(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
 
   useEffect(() => {
     if (check.data) {
@@ -315,6 +317,9 @@ export default function LibraryTracker({ media }) {
           <Button variant="secondary" leftIcon={NotebookPen} disabled={busy} onClick={() => setNotesOpen(true)}>
             {entry.notes ? 'Edit notes' : 'Add notes'}
           </Button>
+          <Button variant="secondary" leftIcon={FolderPlus} onClick={() => setGroupsOpen(true)}>
+            Add to group
+          </Button>
           <Button variant="ghost" leftIcon={Trash2} disabled={busy} onClick={() => setRemoveOpen(true)} className="ml-auto hover:!text-[#ff9b9b]">
             Remove
           </Button>
@@ -332,6 +337,7 @@ export default function LibraryTracker({ media }) {
         </div>
       )}
 
+      <GroupPicker open={groupsOpen} entry={entry} onClose={() => setGroupsOpen(false)} />
       <NotesDialog open={notesOpen} initial={entry.notes} busy={busy} onClose={() => setNotesOpen(false)} onSave={saveNotes} />
 
       <Modal
