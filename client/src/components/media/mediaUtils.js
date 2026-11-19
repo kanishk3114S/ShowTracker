@@ -1,7 +1,7 @@
 export const TYPE_LABELS = { ANIME: 'Anime', MOVIE: 'Movie', TV: 'TV Show' };
 export const TYPE_PLURAL = { ANIME: 'Anime', MOVIE: 'Movies', TV: 'TV Shows' };
 
-export const PROVIDER_NAMES = { ANILIST: 'AniList', TMDB: 'TMDB' };
+export const PROVIDER_NAMES = { ANILIST: 'AniList', TMDB: 'TMDB', TVMAZE: 'TVMaze', TVDB: 'TheTVDB' };
 
 export const mediaPath = (m) =>
   `/media/${m.provider.toLowerCase()}/${m.mediaType.toLowerCase()}/${m.externalId}`;

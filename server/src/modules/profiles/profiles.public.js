@@ -75,7 +75,7 @@ async function listPublicLibrary(userId, { status, mediaType, sort = 'updated_at
             watched_episodes_count, total_episodes
        FROM public.public_library_entries
       WHERE ${where.join(' AND ')}
-      ORDER BY ${PUBLIC_SORTS[sort] ?? PUBLIC_SORTS.updated_at} ${direction} NULLS LAST, updated_at DESC
+      ORDER BY ${Object.hasOwn(PUBLIC_SORTS, sort) ? PUBLIC_SORTS[sort] : PUBLIC_SORTS.updated_at} ${direction} NULLS LAST, updated_at DESC
       LIMIT 500`,
     params
   );

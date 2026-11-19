@@ -64,7 +64,9 @@ const PROVIDER_ERROR_KINDS = {
 };
 
 /** Shared fetch wrapper: timeout + network error mapping. Reads globalThis.fetch at call time (mockable). */
-export async function fetchWithTimeout(provider, url, options = {}, timeoutMs = 8000) {
+export const DEFAULT_PROVIDER_TIMEOUT_MS = 14_000;
+
+export async function fetchWithTimeout(provider, url, options = {}, timeoutMs = DEFAULT_PROVIDER_TIMEOUT_MS) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

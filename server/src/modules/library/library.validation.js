@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cleanText } from '../../utils/sanitize.js';
 
 export const LIBRARY_STATUSES = ['PLAN_TO_WATCH', 'WATCHING', 'COMPLETED', 'ON_HOLD', 'DROPPED', 'REWATCHING'];
 
@@ -11,7 +12,7 @@ const ratingSchema = z
   .max(10, 'Rating cannot be above 10.')
   .transform((n) => Math.round(n * 10) / 10);
 
-const notesSchema = z.string().max(2000, 'Notes cannot exceed 2000 characters.');
+const notesSchema = z.string().transform(cleanText).pipe(z.string().max(2000, 'Notes cannot exceed 2000 characters.'));
 
 export const addLibrarySchema = z.object({
   mediaId: uuid,

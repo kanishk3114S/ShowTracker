@@ -15,6 +15,7 @@ import { R } from '../../services/resources';
 import { useResource } from '../../hooks/useApiResource';
 import { useDebounce } from '../../hooks/useDebounce';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 const MIN_QUERY = 2;
 const THIS_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: THIS_YEAR - 1959 + 1 }, (_, i) => THIS_YEAR + 1 - i);
@@ -26,6 +27,7 @@ const TYPE_TABS = [
 ];
 
 export default function Explore() {
+  useDocumentHead({ title: 'Explore Anime, Movies & TV Shows — ShowTracker', description: 'Search anime, movies and TV shows, filter by genre and year, and find your next watch.' });
   const [params, setParams] = useSearchParams();
   const type = ['ALL', 'ANIME', 'MOVIE', 'TV'].includes(params.get('type')) ? params.get('type') : 'ALL';
   const q = params.get('q') || '';

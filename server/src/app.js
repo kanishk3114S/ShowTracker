@@ -9,7 +9,7 @@ import mediaRoutes from './modules/media/media.routes.js';
 import libraryRoutes from './modules/library/library.routes.js';
 import { getPublicProfile } from './modules/profiles/profiles.controller.js';
 import { optionalAuth } from './middleware/requireAuth.js';
-import { mediaDiscoveryLimiter, usernameCheckLimiter } from './middleware/rateLimit.js';
+import { mediaDiscoveryLimiter, usernameCheckLimiter, authLimiter, apiLimiter } from './middleware/rateLimit.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
@@ -33,8 +33,9 @@ app.use(
         frameAncestors: ["'none'"]
       }
     },
-    referrerPolicy: { policy: 'no-referrer' },
-    strictTransportSecurity: { maxAge: 15552000, includeSubDomains: true }
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+    frameguard: { action: 'deny' },
+    strictTransportSecurity: { maxAge: 31536000, includeSubDomains: true, preload: true }
   })
 );
 
@@ -53,8 +54,9 @@ app.use(
 );
 
 // Request parsing
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+// Every payload this API accepts is tiny (notes are capped at 2000 characters): 100 kB is plenty.
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Logging
 if (process.env.NODE_ENV !== 'test') {
@@ -62,6 +64,8 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 // Abuse protection for routes that spend provider quota or reveal account names (429 + Retry-After)
+app.use('/api', apiLimiter);
+app.use('/api/auth', authLimiter);
 app.use('/api/media/search', mediaDiscoveryLimiter);
 app.use('/api/media/trending', mediaDiscoveryLimiter);
 app.use('/api/media/franchise', mediaDiscoveryLimiter);

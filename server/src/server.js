@@ -10,8 +10,15 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
 import app from './app.js';
 import { checkDatabaseConnection, closePool, warmPool, startPoolKeepAlive } from './config/database.js';
+import * as tmdb from './providers/tmdb.provider.js';
 
 const PORT = parseInt(process.env.PORT || '5000', 10);
+
+// Browsers only talk to this API from the origins in CLIENT_URL. Forgetting it in production is the most common
+// reason a deployed frontend loads but shows no data (every request is blocked by CORS), so say so loudly.
+if (process.env.NODE_ENV === 'production' && !/^https:\/\//i.test(process.env.CLIENT_URL || '')) {
+  console.warn('⚠️  CLIENT_URL is not set to the https:// address of your frontend. Browsers will block every API call (CORS).');
+}
 
 const server = app.listen(PORT, async () => {
   console.log('====================================================');
@@ -39,6 +46,10 @@ const server = app.listen(PORT, async () => {
     console.warn(`   - The API is still online for health monitoring and diagnostics.`);
   }
   console.log('====================================================');
+
+  // Find out right away whether TMDB is reachable: if it is not, the first visitor already gets the fallback
+  // providers instead of waiting for a timeout (the result opens or closes the TMDB circuit breaker).
+  if (tmdb.isConfigured() && process.env.NODE_ENV !== 'test') tmdb.getGenres('movie', { fast: true }).catch(() => {});
 
   // Pre-open a few connections (first one is already open from the check above) and keep them alive.
   if (dbStatus.ok) {

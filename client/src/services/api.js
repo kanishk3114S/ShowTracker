@@ -2,10 +2,11 @@ import axios from 'axios';
 import { supabase } from '../lib/supabase';
 import { invalidateUserData } from '../lib/queryCache';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_BASE_URL } from '../lib/config';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 12000, // never hang forever if an upstream call stalls; the UI offers a retry
   headers: {
     'Content-Type': 'application/json'
   }
@@ -85,6 +86,9 @@ export async function getPublicProfile(username, params = {}, signal) {
 export function toApiError(err) {
   if (axios.isCancel(err) || err?.code === 'ERR_CANCELED') return null;
   const apiError = err.response?.data?.error;
+  if (!err.response && (err.code === 'ECONNABORTED' || err.code === 'ETIMEDOUT')) {
+    return { code: 'REQUEST_TIMEOUT', message: 'The server took too long to respond. Please try again.', retryAfterSeconds: null, fieldErrors: null, status: null };
+  }
   return {
     code: apiError?.code || (err.response ? 'REQUEST_FAILED' : 'NETWORK_ERROR'),
     message:

@@ -12,6 +12,7 @@ import { Reveal } from '../../components/ui/motion';
 import { useSignIn } from '../../components/auth/SignInContext';
 import { useTrendingArtwork } from '../../hooks/useTrendingArtwork';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 /** Real trending posters in three tilted, floating columns. Renders nothing if the artwork API is unavailable. */
 function HeroCollage({ posters }) {
   const picks = posters.slice(0, 9);
@@ -136,6 +137,7 @@ function FeatureCard({ icon, title, children, preview }) {
 }
 
 export default function Landing() {
+  useDocumentHead({ title: 'ShowTracker — One Account. One Library. Everything You Watch.', description: 'Track every anime, movie and TV show you watch in one private library, episode by episode, and share a profile you are proud of.' });
   const { openSignIn } = useSignIn();
   const { posters, groups } = useTrendingArtwork();
   const one = (type) => (groups[type] ?? []).find((m) => m.posterUrl);

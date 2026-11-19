@@ -112,7 +112,7 @@ test('normalizer: TMDB movie + tv map to the same shape; ratings stay 0-10; unra
   assert.equal(movie.mediaType, 'MOVIE');
   assert.equal(movie.sourceRating, 8.4);
   assert.deepEqual(movie.genres, ['Action', 'Science Fiction']);
-  assert.equal(movie.posterUrl, 'https://image.tmdb.org/t/p/w500/p.jpg');
+  assert.equal(movie.posterUrl, 'https://image.tmdb.org/t/p/w342/p.jpg');
   assert.equal(movie.backdropUrl, 'https://image.tmdb.org/t/p/w1280/b.jpg');
 
   const tv = n.normalizeTmdbMedia(
@@ -312,7 +312,7 @@ test('normalizer: TMDB season and episode mapping (blank names get safe fallback
   assert.equal(s2.name, 'Season 2');
   assert.equal(s2.airDate, null);
   assert.equal(s2.episodeCount, 2);
-  assert.equal(s2.posterUrl, 'https://image.tmdb.org/t/p/w500/s.jpg');
+  assert.equal(s2.posterUrl, 'https://image.tmdb.org/t/p/w342/s.jpg');
   assert.equal(n.normalizeTmdbSeason({ season_number: -1 }), null);
 
   const ep = n.normalizeTmdbEpisode({ episode_number: 4, name: '', runtime: 0, air_date: '2021-02-03' });

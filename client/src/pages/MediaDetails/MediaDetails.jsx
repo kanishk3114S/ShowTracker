@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Clock, ExternalLink, RefreshCw } from 'lucide-react';
 import Container from '../../components/layout/Container';
 import { HeroBackdrop, HeroPoster } from '../../components/media/MediaHero';
 import RatingPill from '../../components/cinema/RatingPill';
@@ -19,12 +19,40 @@ import { R } from '../../services/resources';
 import { useResource } from '../../hooks/useApiResource';
 import { PROVIDER_NAMES, formatDate, formatRuntime, humanize, mediaPath } from '../../components/media/mediaUtils';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
+import JsonLd from '../../components/common/JsonLd';
+import { buildMediaJsonLd } from '../../lib/seo';
 function Fact({ label, value }) {
   if (value === null || value === undefined || value === '') return null;
   return (
     <div>
       <dt className="text-[11px] font-medium uppercase tracking-wider text-fg-subtle">{label}</dt>
       <dd className="mt-1 text-sm text-fg">{value}</dd>
+    </div>
+  );
+}
+
+const SLOW_CODES = new Set(['REQUEST_TIMEOUT', 'PROVIDER_TIMEOUT', 'PROVIDER_UNREACHABLE', 'PROVIDER_UNAVAILABLE', 'NETWORK_ERROR']);
+
+/**
+ * A slow or unreachable provider is a hiccup, not a broken page: a small pill with a retry button,
+ * instead of an error wall. Every other failure keeps the full error panel.
+ */
+function SlowProviderNotice({ error, provider, onRetry }) {
+  if (!SLOW_CODES.has(error?.code)) return <ProviderErrorState error={error} onRetry={onRetry} />;
+  const name = PROVIDER_NAMES[String(provider).toUpperCase()] ?? 'the provider';
+  return (
+    <div className="flex justify-center">
+      <div role="status" className="glass inline-flex max-w-full flex-wrap items-center justify-center gap-x-3 gap-y-2 rounded-full px-5 py-2.5 text-sm text-fg">
+        <Clock className="h-4 w-4 shrink-0 text-amber-400" aria-hidden="true" />
+        <span>
+          Server is slow to reach {name}
+          {error?.code === 'NETWORK_ERROR' ? ' (check your connection)' : ''}.
+        </span>
+        <Button size="sm" variant="primary" leftIcon={RefreshCw} onClick={onRetry}>
+          Try Again
+        </Button>
+      </div>
     </div>
   );
 }
@@ -51,6 +79,14 @@ export default function MediaDetails() {
   const navigate = useNavigate();
   const location = useLocation();
   const { data: media, error, loading, reload } = useResource(R.details({ provider, mediaType, externalId }));
+  const pageUrl = `${window.location.origin}${location.pathname}`;
+  useDocumentHead({
+    title: media ? `${media.title}${media.releaseYear ? ` (${media.releaseYear})` : ''} — ShowTracker` : undefined,
+    description: media?.overview ? media.overview.replace(/\s+/g, ' ').slice(0, 200) : undefined,
+    image: media?.backdropUrl || media?.posterUrl || undefined,
+    type: media ? (media.mediaType === 'MOVIE' ? 'video.movie' : 'video.tv_show') : 'website'
+  });
+  const jsonLd = useMemo(() => buildMediaJsonLd(media, { url: pageUrl }), [media, pageUrl]);
 
   if (loading && !media) return <DetailsSkeleton />;
 
@@ -68,7 +104,7 @@ export default function MediaDetails() {
             }
           />
         ) : (
-          <ProviderErrorState error={error} onRetry={reload} />
+          <SlowProviderNotice error={error} provider={provider} onRetry={reload} />
         )}
       </Container>
     );
@@ -77,6 +113,7 @@ export default function MediaDetails() {
 
   return (
     <article className="relative">
+      <JsonLd data={jsonLd} />
       <HeroBackdrop media={media} />
 
       <Container className="-mt-44 sm:-mt-52">
@@ -143,10 +180,10 @@ export default function MediaDetails() {
             <div className="mt-8 flex flex-wrap items-center gap-3">
               {media.sourceUrl && (
                 <Button as="a" href={media.sourceUrl} target="_blank" rel="noopener noreferrer" variant="secondary" size="sm" rightIcon={ExternalLink}>
-                  View on {PROVIDER_NAMES[media.provider]}
+                  View on {PROVIDER_NAMES[media.dataSource ?? media.provider]}
                 </Button>
               )}
-              <p className="text-xs text-fg-subtle">Data and images provided by {PROVIDER_NAMES[media.provider]}.</p>
+              <p className="text-xs text-fg-subtle">Data and images provided by {PROVIDER_NAMES[media.dataSource ?? media.provider]}.</p>
             </div>
           </Reveal>
         </div>

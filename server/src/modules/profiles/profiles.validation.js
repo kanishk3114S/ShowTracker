@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cleanLine, cleanText } from '../../utils/sanitize.js';
 
 export const usernameRegex = /^[a-z0-9_]{3,30}$/;
 
@@ -12,7 +13,7 @@ export const usernameSchema = z
 
 export const updateProfileSchema = z.object({
   username: usernameSchema.optional(),
-  display_name: z.string().trim().max(80, 'Display name cannot exceed 80 characters.').nullable().optional(),
+  display_name: z.string().transform(cleanLine).pipe(z.string().max(80, 'Display name cannot exceed 80 characters.')).nullable().optional(),
   avatar_url: z
     .string()
     .trim()
@@ -21,7 +22,7 @@ export const updateProfileSchema = z.object({
     .nullable()
     .optional()
     .or(z.literal('')),
-  bio: z.string().trim().max(300, 'Bio cannot exceed 300 characters.').nullable().optional(),
+  bio: z.string().transform((v) => cleanText(v).trim()).pipe(z.string().max(300, 'Bio cannot exceed 300 characters.')).nullable().optional(),
   profile_visibility: z.enum(['PUBLIC', 'PRIVATE']).optional(),
   library_visibility: z.enum(['PUBLIC', 'PRIVATE']).optional()
 });

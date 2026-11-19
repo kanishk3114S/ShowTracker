@@ -16,10 +16,6 @@ import { useMediaPrefetch } from '../../hooks/usePrefetch';
 const DAY = 86_400_000;
 const WEEK_DAYS = 7;
 
-const localIsoDate = (ms) => {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-};
 const startOfLocalDay = (ms) => {
   const d = new Date(ms);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();

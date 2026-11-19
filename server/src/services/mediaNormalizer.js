@@ -8,7 +8,7 @@
  *  - Dates are ISO `YYYY-MM-DD` only when the provider gave a complete date.
  */
 
-const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w500';
+const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w342'; // 342 px is plenty for a card and far lighter than 500
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/w1280';
 
 const nullIfBlank = (value) => {
@@ -199,6 +199,12 @@ export function normalizeTmdbMedia(raw, mediaType, genreMap = new Map()) {
 
   if (raw.tagline !== undefined) media.tagline = nullIfBlank(raw.tagline);
   if (!isMovie && raw.last_air_date !== undefined) media.endDate = normalizeIsoDate(raw.last_air_date);
+  // Ids other databases know this title by (present on detail responses only)
+  {
+    const imdb = nullIfBlank(raw.external_ids?.imdb_id ?? raw.imdb_id);
+    const tvdb = raw.external_ids?.tvdb_id != null ? nullIfBlank(raw.external_ids.tvdb_id) : null;
+    if (imdb || tvdb) media.externalIds = { imdb, tvdb };
+  }
   // Next episode (Release Radar): TMDB gives a calendar date only, no hour.
   if (!isMovie && raw.next_episode_to_air !== undefined) {
     const next = raw.next_episode_to_air;
@@ -265,6 +271,208 @@ export function anilistKnownEpisodeCount(raw) {
   return Number.isInteger(next) && next > 1 ? next - 1 : null;
 }
 
+
+// ------------------------------------------------ fallback providers ---
+// TVMaze and TheTVDB are used only when TMDB is slow or down. Their objects are converted into the
+// same shape as TMDB's, so nothing downstream can tell the difference.
+
+const httpsUrl = (url) => {
+  const u = nullIfBlank(url);
+  return u ? u.replace(/^http:\/\//i, 'https://') : null;
+};
+
+/** TVMaze status -> the wording TMDB uses, so airing/ended logic works unchanged. */
+const TVMAZE_STATUS = { Running: 'Returning Series', Ended: 'Ended', 'To Be Determined': 'In Production', 'In Development': 'Planned' };
+/** TheTVDB status -> the same vocabulary. */
+const TVDB_STATUS = { Continuing: 'Returning Series', Ended: 'Ended', Upcoming: 'Planned' };
+
+export function normalizeTvMazeShow(raw) {
+  if (!raw || raw.id == null) return null;
+  const title = nullIfBlank(raw.name);
+  if (!title) return null;
+  const releaseDate = normalizeIsoDate(raw.premiered);
+  const rating = numberOrNull(raw.rating?.average);
+  const media = {
+    provider: 'TVMAZE',
+    externalId: String(raw.id),
+    mediaType: 'TV',
+
+    title,
+    originalTitle: null,
+    overview: stripHtml(raw.summary),
+
+    posterUrl: httpsUrl(raw.image?.original) ?? httpsUrl(raw.image?.medium),
+    backdropUrl: null,
+
+    releaseDate,
+    releaseYear: yearOf(releaseDate),
+
+    genres: Array.isArray(raw.genres) ? raw.genres.filter(Boolean) : [],
+
+    sourceRating: rating && rating > 0 ? round1(rating) : null, // TVMaze is already 0-10
+    sourceRatingName: 'TVMaze',
+    popularity: numberOrNull(raw.weight),
+
+    totalEpisodes: null,
+    totalSeasons: null,
+    runtimeMinutes: positiveIntOrNull(raw.runtime) ?? positiveIntOrNull(raw.averageRuntime),
+    status: TVMAZE_STATUS[raw.status] ?? nullIfBlank(raw.status),
+    format: null,
+    season: null,
+
+    sourceUrl: nullIfBlank(raw.url) ?? `https://www.tvmaze.com/shows/${raw.id}`,
+    endDate: normalizeIsoDate(raw.ended)
+  };
+  const imdb = nullIfBlank(raw.externals?.imdb);
+  const tvdb = raw.externals?.thetvdb != null ? nullIfBlank(raw.externals.thetvdb) : null;
+  if (imdb || tvdb) media.externalIds = { imdb, tvdb };
+  const next = raw._embedded?.nextepisode;
+  if (next !== undefined || raw._embedded) {
+    const airDate = normalizeIsoDate(next?.airdate);
+    media.nextEpisode = next && airDate ? { airDate, episode: positiveIntOrNull(next.number), season: Number.isInteger(next.season) ? next.season : null } : null;
+  }
+  return media;
+}
+
+const englishOverview = (raw) => {
+  const list = raw?.translations?.overviewTranslations ?? raw?.overviews ?? null;
+  if (Array.isArray(list)) return nullIfBlank(list.find((t) => t?.language === 'eng')?.overview);
+  if (list && typeof list === 'object') return nullIfBlank(list.eng);
+  return null;
+};
+
+/** TheTVDB returns artwork either as a full URL or as a path under artworks.thetvdb.com. */
+const tvdbImage = (value) => {
+  const url = nullIfBlank(value);
+  if (!url) return null;
+  return /^https?:\/\//i.test(url) ? url.replace(/^http:\/\//i, 'https://') : `https://artworks.thetvdb.com${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
+/** TheTVDB series/movie (an /extended object or a /search hit). TheTVDB's own score is not a 0-10 rating, so none is invented. */
+export function normalizeTvDbMedia(raw, mediaType) {
+  // search hits carry `tvdb_id` and an `id` like "movie-113"; records carry a plain numeric `id`
+  const rawId = raw?.tvdb_id ?? raw?.id;
+  const id = rawId == null ? null : String(rawId).replace(/^(series|movie)-/, '');
+  const title = nullIfBlank(raw?.name);
+  if (!id || !title) return null;
+  const isMovie = mediaType === 'MOVIE';
+  const releaseDate = normalizeIsoDate(raw.firstAired ?? raw.first_air_time ?? raw.first_release?.date ?? raw.releases?.[0]?.date);
+  const year = releaseDate ? yearOf(releaseDate) : numberOrNull(Number(raw.year)) || null;
+  return {
+    provider: 'TVDB',
+    externalId: String(id),
+    mediaType: isMovie ? 'MOVIE' : 'TV',
+
+    title,
+    originalTitle: null,
+    overview: nullIfBlank(raw.overview) ?? englishOverview(raw),
+
+    posterUrl: tvdbImage(raw.image ?? raw.image_url),
+    backdropUrl: null,
+
+    releaseDate,
+    releaseYear: year,
+
+    genres: Array.isArray(raw.genres) ? raw.genres.map((g) => (typeof g === 'string' ? g : g?.name)).filter(Boolean) : [],
+
+    sourceRating: null,
+    sourceRatingName: 'TheTVDB',
+    popularity: null,
+
+    totalEpisodes: null,
+    totalSeasons: null,
+    runtimeMinutes: positiveIntOrNull(raw.averageRuntime) ?? positiveIntOrNull(raw.runtime),
+    status: isMovie ? null : TVDB_STATUS[raw.status?.name] ?? nullIfBlank(raw.status?.name),
+    format: null,
+    season: null,
+
+    sourceUrl: `https://thetvdb.com/dereferrer/${isMovie ? 'movie' : 'series'}/${id}`,
+    ...(imdbFromRemoteIds(raw) ? { externalIds: { imdb: imdbFromRemoteIds(raw), tvdb: null } } : {}),
+    endDate: isMovie ? undefined : normalizeIsoDate(raw.lastAired)
+  };
+}
+
+/** IMDb id from an /extended record's `remoteIds` list. */
+const imdbFromRemoteIds = (raw) =>
+  nullIfBlank((Array.isArray(raw?.remoteIds) ? raw.remoteIds : []).find((r) => /imdb/i.test(r?.sourceName ?? ''))?.id);
+
+const seasonLabel = (n) => (n === 0 ? 'Specials' : `Season ${n}`);
+
+function finishPlan(seasonMap, meta = new Map()) {
+  return [...seasonMap.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([seasonNumber, episodes]) => {
+      const m = meta.get(seasonNumber) ?? {};
+      return {
+        seasonNumber,
+        name: m.name ?? seasonLabel(seasonNumber),
+        overview: m.overview ?? null,
+        posterUrl: m.posterUrl ?? null,
+        airDate: m.airDate ?? null,
+        episodeCount: episodes.length,
+        episodes
+      };
+    });
+}
+
+/**
+ * Season/episode plan (the shape episodeCatalog persists) from TVMaze's /seasons and /episodes.
+ * Specials have no episode number: they become Season 0 ("Specials"), numbered in order.
+ */
+export function buildPlanFromTvMaze({ seasons = [], episodes = [] } = {}) {
+  const meta = new Map();
+  for (const s of seasons) {
+    if (!Number.isInteger(s?.number) || s.number < 0) continue;
+    meta.set(s.number, {
+      name: nullIfBlank(s.name) ?? undefined,
+      overview: stripHtml(s.summary),
+      posterUrl: httpsUrl(s.image?.original) ?? httpsUrl(s.image?.medium),
+      airDate: normalizeIsoDate(s.premiereDate)
+    });
+  }
+  const bySeason = new Map();
+  let specials = 0;
+  for (const ep of episodes) {
+    const regular = Number.isInteger(ep?.season) && ep.season > 0 && positiveIntOrNull(ep.number);
+    const seasonNumber = regular ? ep.season : 0;
+    const episodeNumber = regular ? ep.number : ++specials;
+    const list = bySeason.get(seasonNumber) ?? [];
+    if (list.some((e) => e.episodeNumber === episodeNumber)) continue; // a duplicate never creates a second row
+    list.push({
+      episodeNumber,
+      title: nullIfBlank(ep.name) ?? `Episode ${episodeNumber}`,
+      overview: stripHtml(ep.summary),
+      airDate: normalizeIsoDate(ep.airdate),
+      runtimeMinutes: positiveIntOrNull(ep.runtime)
+    });
+    bySeason.set(seasonNumber, list);
+  }
+  for (const list of bySeason.values()) list.sort((a, b) => a.episodeNumber - b.episodeNumber);
+  return finishPlan(bySeason, meta);
+}
+
+/** Season/episode plan from TheTVDB's /series/:id/episodes/default (seasonNumber 0 = specials). */
+export function buildPlanFromTvDb(episodes = []) {
+  const bySeason = new Map();
+  for (const ep of episodes) {
+    const seasonNumber = Number.isInteger(ep?.seasonNumber) && ep.seasonNumber >= 0 ? ep.seasonNumber : null;
+    const episodeNumber = positiveIntOrNull(ep?.number);
+    if (seasonNumber === null || !episodeNumber) continue;
+    const list = bySeason.get(seasonNumber) ?? [];
+    if (list.some((e) => e.episodeNumber === episodeNumber)) continue;
+    list.push({
+      episodeNumber,
+      title: nullIfBlank(ep.name) ?? `Episode ${episodeNumber}`,
+      overview: nullIfBlank(ep.overview),
+      airDate: normalizeIsoDate(ep.aired),
+      runtimeMinutes: positiveIntOrNull(ep.runtime)
+    });
+    bySeason.set(seasonNumber, list);
+  }
+  for (const list of bySeason.values()) list.sort((a, b) => a.episodeNumber - b.episodeNumber);
+  return finishPlan(bySeason);
+}
+
 /** Normalize a page of provider results and drop entries that could not be normalized. */
 export const compact = (items) => items.filter(Boolean);
 
@@ -276,5 +484,7 @@ export default {
   normalizeTmdbScore,
   normalizeAniListMedia,
   normalizeTmdbMedia,
+  normalizeTvMazeShow,
+  normalizeTvDbMedia,
   compact
 };

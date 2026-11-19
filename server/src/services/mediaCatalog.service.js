@@ -3,6 +3,20 @@ import * as tmdb from '../providers/tmdb.provider.js';
 import { ProviderError } from '../providers/providerError.js';
 import { normalizeAniListMedia, normalizeTmdbMedia, compact } from './mediaNormalizer.js';
 import { getFranchiseSummary } from './franchise.service.js';
+import { readStoredDetails, isSnapshotFresh } from './catalogSnapshot.service.js';
+import {
+  isFallbackWorthy,
+  loadSourceInfo,
+  canFallBack,
+  fetchDetailsFallback,
+  rememberTitles
+} from './fallbackProviders.service.js';
+import { linkSource } from './mediaPersistence.service.js';
+import { fetchListFallback, listFallbackAvailable } from './fallbackLists.service.js';
+import { tmdbCircuitOpen } from '../providers/providerHealth.js';
+import * as tvmaze from '../providers/tvmaze.provider.js';
+import * as tvdb from '../providers/tvdb.provider.js';
+import { normalizeTvMazeShow, normalizeTvDbMedia } from './mediaNormalizer.js';
 import { upsertMediaFromDetails } from './mediaPersistence.service.js';
 import { TTLCache } from '../utils/ttlCache.js';
 
@@ -28,6 +42,7 @@ export const cache = new TTLCache({ maxEntries: 500 });
 // provider-key -> catalog id of titles already saved to the database (bounded, process-local)
 const persistedIds = new Map();
 const PERSIST_TTL_MS = 6 * 60 * 60 * 1000;
+const FALLBACK_CACHE_MS = 5 * 60 * 1000;
 
 const PROVIDER_FOR_TYPE = { ANIME: 'ANILIST', MOVIE: 'TMDB', TV: 'TMDB' };
 const TMDB_PATH = { MOVIE: 'movie', TV: 'tv' };
@@ -43,11 +58,64 @@ const errorSummary = (err) => ({
 });
 
 /** id -> name map for TMDB genre ids (cached 24h). */
-async function getTmdbGenreMap(mediaType) {
+async function getTmdbGenreMap(mediaType, opts) {
   const genres = await cache.getOrLoad(`genres:tmdb:${mediaType}`, TTL.genres, () =>
-    tmdb.getGenres(TMDB_PATH[mediaType])
+    tmdb.getGenres(TMDB_PATH[mediaType], opts)
   );
   return new Map(genres.map((g) => [g.id, g.name]));
+}
+
+// Last good answer per list, kept in memory (until restart) as the final safety net when every provider fails.
+const lastGood = new Map();
+const LAST_GOOD_MAX = 200;
+const rememberGood = (key, result) => {
+  lastGood.delete(key);
+  lastGood.set(key, result);
+  if (lastGood.size > LAST_GOOD_MAX) lastGood.delete(lastGood.keys().next().value);
+  return result;
+};
+export const resetLastGoodLists = () => lastGood.clear();
+
+/** Failures worth a fallback for LISTS: the transient ones, plus a missing or rejected TMDB token. */
+const listFallbackWorthy = (err) => isFallbackWorthy(err) || (err instanceof ProviderError && ['NOT_CONFIGURED', 'AUTH'].includes(err.kind));
+
+/**
+ * One TMDB list (trending / browse / search) with the fallback chain behind it:
+ *   1. while TMDB is known to be unreachable (circuit open) go straight to the fallback providers
+ *   2. otherwise ask TMDB (one short attempt when a fallback exists, so a slow TMDB hands over quickly)
+ *   3. on a transient failure: TVMaze / TheTVDB (see fallbackLists.service.js)
+ *   4. if those fail too: the last good copy of this exact list (flagged stale), else the original error
+ * A real "bad request" or "not found" from TMDB is never second-guessed.
+ */
+async function tmdbListWithFallback({ key, mediaType, primary, fallback }) {
+  const canFall = listFallbackAvailable(mediaType);
+  const tryFallback = async () => {
+    try {
+      const result = await fallback();
+      return result ? rememberGood(key, result) : null;
+    } catch (err) {
+      console.warn(`[MediaCatalog] Fallback for ${key} failed: ${err.message}`);
+      return null;
+    }
+  };
+
+  if (canFall && tmdbCircuitOpen()) {
+    const result = await tryFallback();
+    if (result) return result;
+  }
+  try {
+    return rememberGood(key, await primary({ fast: canFall }));
+  } catch (err) {
+    if (!listFallbackWorthy(err)) throw err;
+    console.warn(`[MediaCatalog] TMDB failed for ${key} (${err.message}); trying the fallback providers.`);
+    if (canFall) {
+      const result = await tryFallback();
+      if (result) return result;
+    }
+    const stale = lastGood.get(key);
+    if (stale) return { ...stale, extra: { ...stale.extra, stale: true, label: 'Showing your last results (TMDB is unreachable)' } };
+    throw err;
+  }
 }
 
 /** Runs one provider call for one media type and returns a normalized "group". */
@@ -127,7 +195,12 @@ async function searchGroup(mediaType, { q, page, genre, year }) {
         return { items: compact(items.map(normalizeAniListMedia)), pageInfo };
       }
 
-      const genreMap = await getTmdbGenreMap(mediaType);
+      return tmdbListWithFallback({
+        key,
+        mediaType,
+        fallback: () => fetchListFallback(mediaType, { q, page, year, genres: wanted }),
+        primary: async (opts) => {
+      const genreMap = await getTmdbGenreMap(mediaType, opts);
       const ignoredFilters = [];
       let genreIds;
       if (wanted.length > 0) {
@@ -147,16 +220,16 @@ async function searchGroup(mediaType, { q, page, genre, year }) {
       let page$;
       if (mediaType === 'MOVIE') {
         page$ = q
-          ? await tmdb.searchMovies({ query: q, page, year })
-          : await tmdb.discoverMovies({ page, genreIds, year });
+          ? await tmdb.searchMovies({ query: q, page, year }, opts)
+          : await tmdb.discoverMovies({ page, genreIds, year }, opts);
       } else {
-        page$ = q ? await tmdb.searchTv({ query: q, page, year }) : await tmdb.discoverTv({ page, genreIds, year });
+        page$ = q ? await tmdb.searchTv({ query: q, page, year }, opts) : await tmdb.discoverTv({ page, genreIds, year }, opts);
       }
-      return {
-        items: compact(page$.items.map((raw) => normalizeTmdbMedia(raw, mediaType, genreMap))),
-        pageInfo: page$.pageInfo,
-        extra: { ignoredFilters }
-      };
+      const items = compact(page$.items.map((raw) => normalizeTmdbMedia(raw, mediaType, genreMap)));
+      rememberTitles(items);
+      return { items, pageInfo: page$.pageInfo, extra: { ignoredFilters } };
+        }
+      });
     })
   );
 }
@@ -191,13 +264,25 @@ async function trendingGroup(mediaType, { window, page }) {
           }
         };
       }
-      const genreMap = await getTmdbGenreMap(mediaType);
-      const { items, pageInfo } = await tmdb.getTrending({ mediaType: TMDB_PATH[mediaType], window, page });
-      return {
-        items: compact(items.map((raw) => normalizeTmdbMedia(raw, mediaType, genreMap))),
-        pageInfo,
-        extra: { window, label: window === 'day' ? 'Trending today on TMDB' : 'Trending this week on TMDB' }
-      };
+      return tmdbListWithFallback({
+        key,
+        mediaType,
+        fallback: async () => {
+          const fb = await fetchListFallback(mediaType, { page });
+          return fb && { ...fb, extra: { ...fb.extra, window } };
+        },
+        primary: async (opts) => {
+          const genreMap = await getTmdbGenreMap(mediaType, opts);
+          const { items, pageInfo } = await tmdb.getTrending({ mediaType: TMDB_PATH[mediaType], window, page }, opts);
+          const normalized = compact(items.map((raw) => normalizeTmdbMedia(raw, mediaType, genreMap)));
+          rememberTitles(normalized);
+          return {
+            items: normalized,
+            pageInfo,
+            extra: { window, label: window === 'day' ? 'Trending today on TMDB' : 'Trending this week on TMDB' }
+          };
+        }
+      });
     })
   );
 }
@@ -236,37 +321,119 @@ async function resolveSeries(externalId) {
   }
 }
 
+/**
+ * One title's details from its provider.
+ *
+ * TMDB titles are covered by a fallback chain (TMDB -> TVMaze -> TheTVDB; movies: TMDB -> TheTVDB) for the
+ * failures a retry cannot fix: timeouts, dropped connections, 5xx, rate limits. A 404 is final.
+ * `hasStored`: a stored copy exists and will cover a failure better than a thinner fallback record, so
+ * TMDB just gets its short attempt and the caller serves the stored copy.
+ *
+ * Returns { media, fallback }. `fallback` is set when another provider supplied the data:
+ * { existingMediaId } when the title already has a catalog row (that row is left untouched).
+ */
+async function fetchDetailsFromProvider(provider, mediaType, externalId, { hasStored = false } = {}) {
+  if (provider === 'ANILIST') {
+    const media = normalizeAniListMedia(await anilist.getAnimeDetails(externalId));
+    if (!media) throw new ProviderError('AniList', 'NOT_FOUND');
+    return { media, fallback: null };
+  }
+
+  if (provider === 'TVMAZE') {
+    const media = normalizeTvMazeShow(await tvmaze.getTvDetails(externalId));
+    if (!media) throw new ProviderError('TVMaze', 'NOT_FOUND');
+    return { media, fallback: null };
+  }
+  if (provider === 'TVDB') {
+    const raw = mediaType === 'MOVIE' ? await tvdb.getMovieDetails(externalId) : await tvdb.getSeriesDetails(externalId);
+    const media = normalizeTvDbMedia(raw, mediaType);
+    if (!media) throw new ProviderError('TheTVDB', 'NOT_FOUND');
+    return { media, fallback: null };
+  }
+
+  const info = hasStored ? null : await loadSourceInfo({ provider, mediaType, externalId });
+  const fallbackReady = hasStored || canFallBack(info);
+  try {
+    // TMDB is known to be unreachable and something else can answer: do not wait for it again
+    if (fallbackReady && tmdbCircuitOpen()) throw new ProviderError('TMDB', 'NETWORK');
+    const opts = { fast: fallbackReady }; // a fallback is ready: hand over after a short attempt
+    const raw =
+      mediaType === 'MOVIE' ? await tmdb.getMovieDetails(externalId, opts) : await tmdb.getTvDetails(externalId, opts);
+    const media = normalizeTmdbMedia(raw, mediaType);
+    if (!media) throw new ProviderError('TMDB', 'NOT_FOUND');
+    rememberTitles([media]);
+    return { media, fallback: null };
+  } catch (err) {
+    if (hasStored || !isFallbackWorthy(err) || !canFallBack(info)) throw err;
+    console.warn(`[MediaCatalog] TMDB failed for ${mediaType} ${externalId} (${err.message}); trying the fallback providers.`);
+    const result = await fetchDetailsFallback({ provider, mediaType, externalId }, info);
+    if (!result) throw err; // nobody could help: report the original problem
+    if (info.mediaId) {
+      // the title is already in the catalog: keep its row as it is, just remember the extra provider id
+      try {
+        await linkSource(info.mediaId, result.source.provider, mediaType, result.source.externalId);
+      } catch (linkErr) {
+        console.warn('[MediaCatalog] Could not link the fallback source:', linkErr.message);
+      }
+      return { media: result.media, fallback: { existingMediaId: info.mediaId } };
+    }
+    return { media: result.media, fallback: { existingMediaId: null } };
+  }
+}
+
 export async function getMediaDetails({ provider, mediaType, externalId, refresh = false }) {
   const key = `details:${provider}:${mediaType}:${externalId}`;
-  return cache.getOrLoad(
+  const result = await cache.getOrLoad(
     key,
     TTL.details,
     async () => {
+      // 1. The database first: a title we already know is not blocked on a live provider call.
+      const stored = await readStoredDetails(provider, mediaType, externalId);
       let media;
-      if (provider === 'ANILIST') {
-        media = normalizeAniListMedia(await anilist.getAnimeDetails(externalId));
+      let catalogId = null;
+      let fromStore = false;
+      if (stored && !refresh && isSnapshotFresh(stored)) {
+        media = stored.media;
+        catalogId = stored.id;
+        fromStore = true;
       } else {
-        const raw =
-          mediaType === 'MOVIE' ? await tmdb.getMovieDetails(externalId) : await tmdb.getTvDetails(externalId);
-        media = normalizeTmdbMedia(raw, mediaType);
+        try {
+          const fetched = await fetchDetailsFromProvider(provider, mediaType, externalId, { hasStored: Boolean(stored) });
+          media = fetched.media;
+          if (fetched.fallback?.existingMediaId) {
+            catalogId = fetched.fallback.existingMediaId;
+            fromStore = true; // existing row: nothing is written over it
+          }
+        } catch (err) {
+          // 2. The provider is slow or down: a stale stored copy beats an error page.
+          if (stored && err instanceof ProviderError && err.kind !== 'NOT_FOUND') {
+            console.warn(`[MediaCatalog] ${provider} failed (${err.message}); serving the stored copy of ${externalId}.`);
+            media = stored.media;
+            catalogId = stored.id;
+            fromStore = true;
+          } else {
+            throw err;
+          }
+        }
       }
-      if (!media) throw new ProviderError(provider === 'ANILIST' ? 'AniList' : 'TMDB', 'NOT_FOUND');
 
       // Opening a details page adds the title to the shared catalog (idempotent upsert).
       // A database problem must not break browsing, so it is logged and the page still renders.
       // A title saved recently is not saved again (the database is remote: ~10 round trips per save).
       // `refresh` forces a re-save.
-      let catalogId = null;
-      const known = persistedIds.get(key);
-      if (known && !refresh && Date.now() - known.at < PERSIST_TTL_MS) {
-        catalogId = known.id;
-      } else {
-        try {
-          catalogId = await upsertMediaFromDetails(media);
-          if (persistedIds.size >= 2000) persistedIds.delete(persistedIds.keys().next().value);
-          persistedIds.set(key, { id: catalogId, at: Date.now() });
-        } catch (err) {
-          console.error('[MediaCatalog] Could not persist media to catalog:', err.message);
+      if (!fromStore) {
+        const known = persistedIds.get(key);
+        if (known && !refresh && Date.now() - known.at < PERSIST_TTL_MS) {
+          catalogId = known.id;
+        } else {
+          try {
+            catalogId = await upsertMediaFromDetails(media);
+            if (persistedIds.size >= 2000) persistedIds.delete(persistedIds.keys().next().value);
+            // data from a fallback provider must not block the richer TMDB copy from being saved later
+            if (!media.dataSource) persistedIds.set(key, { id: catalogId, at: Date.now() });
+          } catch (err) {
+            console.error('[MediaCatalog] Could not persist media to catalog:', err.message);
+          }
         }
       }
       const series = provider === 'ANILIST' && mediaType === 'ANIME' ? await resolveSeries(externalId) : null;
@@ -274,6 +441,9 @@ export async function getMediaDetails({ provider, mediaType, externalId, refresh
     },
     { refresh }
   );
+  // A record that came from a fallback provider is only kept briefly, so TMDB is asked again soon.
+  if (result.dataSource && result.dataSource !== result.provider) cache.set(key, result, FALLBACK_CACHE_MS);
+  return result;
 }
 
 // ------------------------------------------------------------------ genres --

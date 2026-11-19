@@ -27,13 +27,26 @@ export const notFoundHandler = (req, res, next) => {
   next(new AppError(`Route not found: ${req.method} ${req.originalUrl}`, 404, 'NOT_FOUND'));
 };
 
+/** A stable, machine-readable code: ours when we set one, a clear one for body-parser problems, else generic. */
+function errorCode(err) {
+  if (typeof err.code === 'string' && /^[A-Z][A-Z0-9_]*$/.test(err.code)) return err.code;
+  if (err.type === 'entity.too.large') return 'PAYLOAD_TOO_LARGE';
+  if (err.type === 'entity.parse.failed') return 'INVALID_JSON';
+  return 'INTERNAL_SERVER_ERROR';
+}
+
 /**
  * Centralized express error handler middleware.
  * Guarantees a consistent JSON response and avoids leaking stack traces in production.
  */
 export const errorHandler = (err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
   const isDevelopment = process.env.NODE_ENV !== 'production';
+  // Only errors we raised on purpose (AppError / ProviderError) or http-errors marked `expose` (bad JSON,
+  // payload too large) may show their message. Anything else (database driver errors, bugs) is masked in
+  // production: no SQL, table names, file paths or stack traces ever reach a client.
+  const operational = err.isOperational === true || err.expose === true;
+  const masked = !isDevelopment && !operational;
+  const statusCode = masked ? 500 : err.statusCode || err.status || 500;
 
   // Log error with appropriate severity
   if (statusCode >= 500) {
@@ -45,9 +58,9 @@ export const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({
     success: false,
     error: {
-      message: err.message || 'An unexpected internal error occurred.',
-      code: err.code || 'INTERNAL_SERVER_ERROR',
-      ...(err.details ? { details: err.details } : {}),
+      message: masked ? 'An unexpected internal error occurred.' : err.message || 'An unexpected internal error occurred.',
+      code: masked ? 'INTERNAL_SERVER_ERROR' : errorCode(err),
+      ...(!masked && err.details ? { details: err.details } : {}),
       ...(isDevelopment && err.stack ? { stack: err.stack } : {})
     }
   });

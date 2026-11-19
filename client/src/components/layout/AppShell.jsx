@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'motion/react';
 import TopHeader from './TopHeader';
@@ -6,7 +6,13 @@ import MobileNav from './MobileNav';
 import Footer from './Footer';
 import { SignInProvider } from '../auth/SignInContext';
 import { ToastProvider } from '../ui/Toast';
+import ErrorBoundary from '../common/ErrorBoundary';
 import { prefetchAllRoutesWhenIdle } from '../../routes/pages';
+
+// Optional extras are loaded lazily and fail quietly: if a content blocker (Brave Shields, uBlock, ...) stops one of
+// these files from loading, the rest of the app must still work.
+const StorageNotice = lazy(() => import('../common/StorageNotice'));
+const OfflineNotice = lazy(() => import('../common/OfflineNotice'));
 
 /**
  * Persistent frame for every standard page: sticky header (desktop nav + user
@@ -48,11 +54,19 @@ export default function AppShell() {
                 </div>
               }
             >
+              <ErrorBoundary resetKey={location.pathname}>
               <Outlet />
+            </ErrorBoundary>
             </Suspense>
           </motion.main>
           <Footer />
           <MobileNav />
+          <ErrorBoundary fallback={null}>
+            <Suspense fallback={null}>
+              <StorageNotice />
+              <OfflineNotice />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </ToastProvider>
     </SignInProvider>

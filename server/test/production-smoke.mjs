@@ -14,7 +14,7 @@ import request from 'supertest';
 // Static imports are hoisted above the env assignments, so load the app dynamically after them.
 const { default: app } = await import('../src/app.js');
 const { closePool } = await import('../src/config/database.js');
-const { mediaDiscoveryLimiter, usernameCheckLimiter } = await import('../src/middleware/rateLimit.js');
+const { mediaDiscoveryLimiter, usernameCheckLimiter, authLimiter } = await import('../src/middleware/rateLimit.js');
 
 let passed = 0;
 let failed = 0;
@@ -46,9 +46,12 @@ await test('security headers: strict CSP, nosniff, HSTS, no framing, no x-powere
   assert.match(csp, /default-src 'none'/);
   assert.match(csp, /frame-ancestors 'none'/);
   assert.equal(res.headers['x-content-type-options'], 'nosniff');
-  assert.match(res.headers['strict-transport-security'] ?? '', /max-age=\d+/);
-  assert.equal(res.headers['referrer-policy'], 'no-referrer');
-  assert.ok(res.headers['x-frame-options'], 'x-frame-options missing');
+  const hsts = res.headers['strict-transport-security'] ?? '';
+  assert.match(hsts, /max-age=31536000/);
+  assert.match(hsts, /includeSubDomains/);
+  assert.match(hsts, /preload/);
+  assert.equal(res.headers['referrer-policy'], 'strict-origin-when-cross-origin');
+  assert.equal(res.headers['x-frame-options'], 'DENY');
   assert.equal(res.headers['x-powered-by'], undefined);
 });
 
@@ -108,6 +111,25 @@ await test('rate limit: username-availability allows 30/min then answers 429', a
   assert.equal(limited.body.error.code, 'RATE_LIMITED');
   assert.ok(Number(limited.headers['retry-after']) >= 1);
   usernameCheckLimiter.reset();
+});
+
+await test('rate limit: /api/auth allows 60/min then answers 429 with Retry-After', async () => {
+  authLimiter.reset();
+  for (let i = 1; i <= 60; i++) {
+    const res = await request(app).get('/api/auth/me'); // no token: 401 locally, no database or Supabase call
+    assert.equal(res.status, 401, `request ${i}`);
+  }
+  const limited = await request(app).get('/api/auth/me');
+  assert.equal(limited.status, 429);
+  assert.equal(limited.body.error.code, 'RATE_LIMITED');
+  assert.ok(Number(limited.headers['retry-after']) >= 1);
+  authLimiter.reset();
+});
+
+await test('payload limit: bodies above 100 kB are refused with 413', async () => {
+  const res = await request(app).post('/api/library/groups').set('Content-Type', 'application/json').send(JSON.stringify({ name: 'x'.repeat(150_000) }));
+  assert.equal(res.status, 413);
+  assert.equal(res.body.error.code, 'PAYLOAD_TOO_LARGE');
 });
 
 await test('rate limit: other routes are not affected (health still 200 while search is limited)', async () => {

@@ -109,7 +109,7 @@ export async function listLibrary(client, userId, { status, mediaType, sort, ord
     );
   }
   const direction = order === 'asc' ? 'ASC' : 'DESC';
-  const orderBy = `${SORTS[sort] ?? SORTS.updated_at} ${direction} NULLS LAST, ul.updated_at DESC`;
+  const orderBy = `${Object.hasOwn(SORTS, sort) ? SORTS[sort] : SORTS.updated_at} ${direction} NULLS LAST, ul.updated_at DESC`;
 
   const { rows } = await client.query(
     `${ENTRY_SELECT} WHERE ${where.join(' AND ')} ORDER BY ${orderBy} LIMIT ${Math.min(Math.max(Number(limit) || 500, 1), 500)}`,

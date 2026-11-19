@@ -271,6 +271,49 @@ ShowTracker is two small apps plus Supabase: a **static React frontend** (Vercel
 
 The limiter is a dependency-free fixed window kept in memory, which is right for a single instance. If you scale to several instances, move it to a shared store such as Redis.
 
+### Provider fallback (TMDB -> TVMaze -> TheTVDB)
+
+TMDB is the primary source. When it is slow or failing (timeout, dropped connection, 5xx, rate limit; never a plain 404), title details and TV episode lists fall back to **TVMaze** (no key) and then **TheTVDB** (needs `TVDB_API_KEY`, optional; movies use TheTVDB only).
+
+- A title always keeps **one internal id**. User libraries, groups and watched episodes point at `media_items.id` / `episodes.id`, never at a provider id, so switching providers can never reset or orphan them. The extra provider ids are stored in `media_sources` (migration 009).
+- A fallback only **adds what is missing**: seasons and episodes already stored are never rewritten, so existing episode ids and TMDB data are safe. When TMDB is back it takes over again (matched by season and episode number, so the same rows are updated).
+- Matching is strict (exact IDs from TMDB first, then an exact normalized title with the premiere year within one year). If no match is certain, no fallback is used.
+- Ended shows are re-checked once a month; stored titles are served from the database while fresh.
+- **Lists too** (Trending, Explore, search): if TMDB cannot answer, TV comes from TVMaze (what is airing now, ranked by popularity; its search) and then TheTVDB, and movies from TheTVDB (needs `TVDB_API_KEY`; TVMaze has no movies). The last good copy of a list is the final safety net.
+- **Circuit breaker:** after one transport failure TMDB is skipped for 90 seconds, so a blocked or down TMDB costs one short attempt, not a timeout per page. The server also probes TMDB at startup.
+- Titles opened from a fallback list keep that provider's identity (`/media/tvmaze/tv/<id>`). If the same title is later opened through TMDB it is **joined, never duplicated**: matched by IMDb id, or by exact title and release year, and your library entry stays on the same row.
+
+### Security checklist (pre-production)
+
+| Area | State |
+|---|---|
+| **SQL** | Every query is parameterized (`$1, $2, ...`). The only interpolated text is fixed column lists, `$n` placeholders, an allow-listed sort column (`Object.hasOwn` guarded) and a numeric-clamped `LIMIT`. |
+| **Ownership (IDOR)** | Every user-data query filters `user_id` explicitly, and Row Level Security is enabled **and forced** on every user table. A guessed id returns 404 (covered by tests). |
+| **Input** | Names, bios, notes and group text are stripped of HTML tags, control and bidi characters, then length-checked. Usernames are `^[a-z0-9_]{3,30}$`. No `dangerouslySetInnerHTML` anywhere. |
+| **API headers** | JSON-only CSP (`default-src 'none'`), HSTS (1 year, preload), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`. |
+| **Frontend headers** | [`client/vercel.json`](client/vercel.json) / [`client/public/_headers`](client/public/_headers) send a strict CSP. **Edit `connect-src` to your real API host** if it is not `*.onrender.com` or `*.up.railway.app`. Avatars pasted as a link must be on an allowed image host (uploads to Supabase always work). |
+| **Limits** | JSON bodies 100 kB. Per IP: search + trending + franchise 60/min, username check 30/min, `/api/auth` 60/min, whole `/api` 600/min (HTTP 429 + `Retry-After`). |
+| **Errors** | In production, unexpected errors (database, bugs) return a generic message: no SQL, paths or stacks. Deliberate errors keep their clear message. |
+| **Resilience** | TMDB timeout 12 s with one jittered retry; title pages are served from the database snapshot while it is fresh (20 min airing, 6 h otherwise) and fall back to a stale copy when the provider is down. |
+
+### Deploying both on Render (Blueprint)
+
+[`render.yaml`](render.yaml) describes both services. In Render: **New > Blueprint**, pick this repo, then fill the variables marked `sync: false`:
+
+| Service | Variable | Value |
+|---|---|---|
+| API (`showtracker-api`) | `CLIENT_URL` | the frontend's address, `https://<your-web>.onrender.com` |
+| API | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL`, `TMDB_API_READ_ACCESS_TOKEN` | as in `server/.env.example` |
+| Web (`showtracker-web`) | `VITE_API_URL` | the API's address **plus `/api`**, `https://<your-api>.onrender.com/api` |
+| Web | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SITE_URL` | your Supabase values and the web address |
+
+**If the deployed site shows no data or a blank page, check these in order:**
+1. A static site needs the rewrite `/*` to `/index.html` (the blueprint sets it; in the dashboard it is *Redirects/Rewrites*). Without it, refreshing any page except `/` fails.
+2. `VITE_*` values are baked in at **build** time: after changing one, trigger a **new deploy** (a restart is not enough). A build without them now shows a "not configured yet" page listing what is missing instead of an empty app.
+3. `CLIENT_URL` on the API must be the exact `https://` address of the frontend, or the browser blocks every API call (CORS). The API logs a warning at startup when it is missing.
+4. Render's free API sleeps when idle: the first request can take about 30 seconds.
+5. The `_headers` and `vercel.json` files are for Netlify and Vercel; on Render the headers come from the blueprint.
+
 ### 1. Database (Supabase)
 
 1. Run the one-time role script from [Database setup](#database-setup).

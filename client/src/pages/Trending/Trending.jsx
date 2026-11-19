@@ -12,6 +12,7 @@ import { PosterGridSkeleton, Skeleton } from '../../components/ui/Skeleton';
 import { R } from '../../services/resources';
 import { useResource } from '../../hooks/useApiResource';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 const TYPE_TABS = [
   { value: 'ALL', label: 'All' },
   { value: 'ANIME', label: 'Anime' },
@@ -25,6 +26,7 @@ const WINDOW_TABS = [
 const PREVIEW_COUNT = 12;
 
 export default function Trending() {
+  useDocumentHead({ title: 'Trending Movies, Series & Anime Right Now — ShowTracker', description: 'What everyone is watching this week: trending anime, movies and TV series.' });
   const [params, setParams] = useSearchParams();
   const type = ['ALL', 'ANIME', 'MOVIE', 'TV'].includes(params.get('type')) ? params.get('type') : 'ALL';
   const windowValue = params.get('window') === 'day' ? 'day' : 'week';

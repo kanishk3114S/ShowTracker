@@ -53,16 +53,17 @@ export const genresQuerySchema = z.object({
   type: typeSchema
 });
 
-const VALID_PAIRS = { ANILIST: ['ANIME'], TMDB: ['MOVIE', 'TV'] };
+// TVMAZE and TVDB titles appear when TMDB cannot serve lists (see fallbackLists.service.js)
+const VALID_PAIRS = { ANILIST: ['ANIME'], TMDB: ['MOVIE', 'TV'], TVMAZE: ['TV'], TVDB: ['MOVIE', 'TV'] };
 
 export const detailsParamsSchema = z
   .object({
-    provider: z.string().trim().toUpperCase().pipe(z.enum(['ANILIST', 'TMDB'])),
+    provider: z.string().trim().toUpperCase().pipe(z.enum(['ANILIST', 'TMDB', 'TVMAZE', 'TVDB'])),
     mediaType: z.string().trim().toUpperCase().pipe(z.enum(MEDIA_TYPES)),
     externalId: z.string().trim().regex(/^\d{1,10}$/, 'externalId must be a numeric provider id.')
   })
   .refine((v) => VALID_PAIRS[v.provider].includes(v.mediaType), {
-    message: 'That provider does not serve this media type (ANILIST: ANIME; TMDB: MOVIE or TV).',
+    message: 'That provider does not serve this media type (ANILIST: ANIME; TMDB: MOVIE or TV; TVMAZE: TV; TVDB: MOVIE or TV).',
     path: ['mediaType']
   });
 

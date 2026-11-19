@@ -37,7 +37,7 @@ export default function Footer() {
           <h2 className="text-xs font-semibold uppercase tracking-wider text-fg-subtle">Data &amp; privacy</h2>
           <div className="mt-3 flex items-start gap-3 text-xs leading-relaxed text-fg-muted">
             <TmdbLogo className="mt-0.5 h-3.5 shrink-0" />
-            <p>{TMDB_NOTICE} Anime data courtesy of AniList. Posters and descriptions belong to their owners.</p>
+            <p>{TMDB_NOTICE} Anime data courtesy of AniList. When TMDB is unavailable, TV data comes from TVMaze and TheTVDB. Posters and descriptions belong to their owners.</p>
           </div>
           <p className="mt-3 text-xs leading-relaxed text-fg-subtle">
             Your notes are always private. You choose whether your profile and library are public.

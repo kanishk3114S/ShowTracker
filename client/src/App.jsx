@@ -1,6 +1,6 @@
 import React, { lazy } from 'react';
 import { Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import FullScreenLoader from './components/ui/FullScreenLoader';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './routes/ProtectedRoute';
@@ -9,6 +9,7 @@ import AppShell from './components/layout/AppShell';
 import { pageLoaders } from './routes/pages';
 
 import Landing from './pages/Landing/Landing';
+import NotFound from './pages/NotFound/NotFound';
 const SignIn = lazy(pageLoaders.SignIn);
 const AuthCallback = lazy(pageLoaders.AuthCallback);
 const Onboarding = lazy(pageLoaders.Onboarding);
@@ -89,9 +90,10 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-          </Route>
 
-          <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Anything unknown gets the cinematic 404 inside the normal frame */}
+            <Route path="*" element={<NotFound />} />
+          </Route>
         </Routes>
         </Suspense>
       </AuthProvider>

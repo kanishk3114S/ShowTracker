@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { cleanLine, cleanText } from '../../utils/sanitize.js';
 
 /** Badge colour tokens a shelf can use (the client maps each one to a theme). */
 export const GROUP_COLORS = ['amber', 'rose', 'cyan', 'purple', 'pink', 'emerald', 'sky', 'zinc'];
@@ -8,13 +9,13 @@ const uuid = z.string().uuid('Must be a valid id.');
 
 const nameSchema = z
   .string({ error: 'Name is required.' })
-  .transform((v) => v.trim().replace(/\s+/g, ' '))
+  .transform(cleanLine)
   .refine((v) => v.length > 0, { message: 'Name cannot be empty.' })
   .refine((v) => v.length <= 60, { message: 'Name cannot exceed 60 characters.' });
 
 const descriptionSchema = z
   .string()
-  .transform((v) => v.trim())
+  .transform((v) => cleanText(v).trim())
   .refine((v) => v.length <= 200, { message: 'Description cannot exceed 200 characters.' })
   .transform((v) => (v === '' ? null : v))
   .nullable();

@@ -19,6 +19,7 @@ import { STATUS_ORDER } from '../../components/library/libraryConstants';
 import { R } from '../../services/resources';
 import { useResource } from '../../hooks/useApiResource';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 const VIEW_KEY = 'showtracker.libraryView';
 const readView = () => {
   try {
@@ -39,6 +40,7 @@ const EMPTY_COPY = {
 };
 
 export default function Library() {
+  useDocumentHead({ title: 'My Library — ShowTracker', description: 'Your personal library.', noindex: true });
   const [params, setParams] = useSearchParams();
   const status = STATUS_ORDER.includes(params.get('status')) ? params.get('status') : '';
   const mediaType = ['ANIME', 'MOVIE', 'TV'].includes(params.get('type')) ? params.get('type') : '';

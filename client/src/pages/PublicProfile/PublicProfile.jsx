@@ -19,6 +19,7 @@ import { STATUS_ORDER } from '../../components/library/libraryConstants';
 import { R } from '../../services/resources';
 import { useResource } from '../../hooks/useApiResource';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 /** Calm "private" state: a sealed shield on a neutral card (reads as secure and deliberate, not broken). */
 function PrivacyShield({ title, message, action }) {
   return (
@@ -71,6 +72,12 @@ export default function PublicProfile() {
     );
 
   const { data, error, loading, reload } = useResource(R.profile(username, { status, mediaType, sort, order }));
+  useDocumentHead({
+    title: `@${username}'s Profile & Library — ShowTracker`,
+    description: data?.profile?.bio || `@${username} on ShowTracker: the anime, movies and TV shows they watch.`,
+    image: data?.profile?.avatar_url || undefined,
+    type: 'profile'
+  });
 
   const counts = useMemo(() => (data?.stats ? { total: data.stats.totalItems, byStatus: data.stats.byStatus } : null), [data]);
 

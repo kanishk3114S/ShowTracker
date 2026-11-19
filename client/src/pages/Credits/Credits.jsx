@@ -4,7 +4,9 @@ import PageHeader from '../../components/layout/PageHeader';
 import Card from '../../components/ui/Card';
 import { TMDB_NOTICE, TmdbLogo } from '../../components/layout/Footer';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 export default function Credits() {
+  useDocumentHead({ title: 'Credits & Data Sources — ShowTracker', description: 'Where ShowTracker gets its data: TMDB, AniList, TVMaze and TheTVDB.' });
   return (
     <Container className="max-w-3xl py-8 sm:py-10">
       <PageHeader
@@ -34,6 +36,24 @@ export default function Credits() {
           <p className="text-sm text-fg-muted">Anime metadata, cover images, scores and trending rankings, from the public AniList GraphQL API.</p>
           <a href="https://anilist.co" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm text-accent transition hover:text-accent-hover">
             anilist.co
+          </a>
+        </Card>
+
+        <Card>
+          <h2 className="mb-2 text-base font-semibold text-fg">TVMaze</h2>
+          <p className="text-sm text-fg-muted">
+            TV show details, schedules and episode lists when TMDB is unavailable. Data from TVMaze, licensed under CC BY-SA 4.0.
+          </p>
+          <a href="https://www.tvmaze.com" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm text-accent transition hover:text-accent-hover">
+            tvmaze.com
+          </a>
+        </Card>
+
+        <Card>
+          <h2 className="mb-2 text-base font-semibold text-fg">TheTVDB</h2>
+          <p className="text-sm text-fg-muted">Movie and TV metadata and artwork when TMDB and TVMaze cannot serve a title. Data provided by TheTVDB.</p>
+          <a href="https://thetvdb.com" target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-sm text-accent transition hover:text-accent-hover">
+            thetvdb.com
           </a>
         </Card>
       </div>

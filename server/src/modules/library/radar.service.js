@@ -2,6 +2,8 @@ import { pool } from '../../config/database.js';
 import { withUserTransaction } from '../../db/withUserTransaction.js';
 import * as anilist from '../../providers/anilist.provider.js';
 import * as tmdb from '../../providers/tmdb.provider.js';
+import * as tvmaze from '../../providers/tvmaze.provider.js';
+import { tmdbCircuitOpen } from '../../providers/providerHealth.js';
 
 /**
  * Release Radar: when does the next episode of each show in the user's library air?
@@ -60,6 +62,8 @@ const isAiringStatus = (row) =>
 
 function needsRefresh(row, now) {
   if (!row.provider || !row.external_id) return false;
+  if (row.provider === 'TVDB') return false; // TheTVDB has no next-episode data we can use
+  if (row.provider === 'TMDB' && tmdbCircuitOpen()) return false; // TMDB is known to be unreachable: keep stored data
   if (Date.now() - (lastRefresh.get(row.media_id) ?? 0) < REFRESH_COOLDOWN_MS) return false;
   const m = row.metadata ?? {};
   if (row.media_type === 'ANIME') {
@@ -108,6 +112,31 @@ async function refreshAnime(rows, out) {
   }
 }
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The metadata patch (status + next episode) for one TV title, from the provider that owns its identity. */
+async function nextEpisodePatch(row) {
+  if (row.provider === 'TVMAZE') {
+    const show = await tvmaze.getTvDetails(row.external_id);
+    const next = show?._embedded?.nextepisode;
+    const status = { Running: 'Returning Series', Ended: 'Ended', 'To Be Determined': 'In Production', 'In Development': 'Planned' }[show?.status] ?? show?.status;
+    return {
+      status: status ?? row.metadata?.status ?? null,
+      nextAirDate: next?.airdate && ISO_DAY.test(next.airdate) ? next.airdate : null,
+      nextAirEpisode: Number.isInteger(next?.number) ? next.number : null,
+      nextAirSeason: Number.isInteger(next?.season) ? next.season : null
+    };
+  }
+  const tv = await tmdb.getTvDetails(row.external_id);
+  const ep = tv.next_episode_to_air;
+  return {
+    status: tv.status ?? row.metadata?.status ?? null,
+    nextAirDate: ep?.air_date && ISO_DAY.test(ep.air_date) ? ep.air_date : null,
+    nextAirEpisode: ep?.episode_number ?? null,
+    nextAirSeason: ep?.season_number ?? null
+  };
+}
+
 async function refreshTv(rows, out) {
   const batch = rows.slice(0, MAX_TMDB_REFRESHES);
   let next = 0;
@@ -115,14 +144,7 @@ async function refreshTv(rows, out) {
     while (next < batch.length) {
       const row = batch[next++];
       try {
-        const tv = await tmdb.getTvDetails(row.external_id);
-        const ep = tv.next_episode_to_air;
-        const patch = {
-          status: tv.status ?? row.metadata?.status ?? null,
-          nextAirDate: ep?.air_date && /^\d{4}-\d{2}-\d{2}$/.test(ep.air_date) ? ep.air_date : null,
-          nextAirEpisode: ep?.episode_number ?? null,
-          nextAirSeason: ep?.season_number ?? null
-        };
+        const patch = await nextEpisodePatch(row);
         await saveMetadata(row.media_id, patch);
         out.set(row.media_id, { ...row.metadata, ...patch });
         markRefreshed(row.media_id);

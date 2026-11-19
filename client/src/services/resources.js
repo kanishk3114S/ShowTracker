@@ -45,7 +45,9 @@ export const R = {
   // Airing data changes slowly: 15 minutes fresh, stale-while-revalidate after that
   upcoming: () => ({ key: 'me:upcoming', staleMs: 15 * 60_000, fetch: (s) => getUpcomingReleases(s) }),
   checkEntry: (mediaId) => ({ key: `me:check:${mediaId}`, staleMs: ME_STALE, fetch: (s) => checkLibraryEntry(mediaId, s) }),
-  seasons: (mediaId) => ({ key: `me:seasons:${mediaId}`, staleMs: 10 * 60_000, fetch: (s) => getMediaSeasons(mediaId, s) }),
+  // Seasons and episodes are catalog data (not private user data), so they use the 'media:' prefix:
+  // they stay in memory only and their large nested JSON never fills sessionStorage.
+  seasons: (mediaId) => ({ key: `media:seasons:${mediaId}`, staleMs: 15 * 60_000, fetch: (s) => getMediaSeasons(mediaId, s) }),
 
   // ----- public profile page
   profile: (username, { status = '', mediaType = '', sort = 'updated_at', order = 'desc' } = {}) => ({

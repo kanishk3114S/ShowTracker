@@ -11,6 +11,7 @@ import { Reveal } from '../../components/ui/motion';
 import { useAuth } from '../../hooks/useAuth';
 import { updateMyProfile } from '../../services/api';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 const fieldClass =
   'w-full rounded-xl border border-ink-edge bg-ink-raised px-4 py-2.5 text-[15px] text-fg placeholder-fg-subtle outline-none transition focus:border-accent/60 focus:ring-2 focus:ring-accent/20';
 
@@ -217,6 +218,7 @@ function SettingsForm({ profile }) {
 }
 
 export default function Settings() {
+  useDocumentHead({ title: 'Settings & Privacy — ShowTracker', description: 'Manage your profile and privacy.', noindex: true });
   const { profile } = useAuth();
   return (
     <Container className="max-w-3xl py-8 sm:py-10">

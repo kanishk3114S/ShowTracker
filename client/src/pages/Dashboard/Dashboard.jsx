@@ -18,6 +18,7 @@ import { R } from '../../services/resources';
 import { useResource } from '../../hooks/useApiResource';
 import { useAuth } from '../../hooks/useAuth';
 
+import { useDocumentHead } from '../../hooks/useDocumentHead';
 function SectionHeading({ title, subtitle, to, linkLabel }) {
   return (
     <div className="mb-5 flex items-end justify-between gap-3">
@@ -67,6 +68,7 @@ function DashboardSkeleton() {
 }
 
 export default function Dashboard() {
+  useDocumentHead({ title: 'Dashboard — ShowTracker', description: 'Your dashboard.', noindex: true });
   const { user, profile } = useAuth();
   const stats = useResource(R.stats());
   const shelf = useResource(R.continueWatching());

@@ -15,6 +15,50 @@ import { pool } from '../config/database.js';
  * @param {object} media  normalized media object (see mediaNormalizer.js)
  * @returns {Promise<string>} the media_items.id (UUID)
  */
+/** Source records other than the primary one are bookkeeping for media_sources, not part of the stored title. */
+const withoutLinks = ({ alsoKnownAs, ...rest }) => rest; // eslint-disable-line no-unused-vars
+
+/**
+ * Records that a title is also known by another provider (TVMaze, TheTVDB ...). The title keeps its single
+ * internal id; this only adds a lookup row. A provider record already linked to ANOTHER title is left alone.
+ */
+export async function linkSource(mediaId, provider, mediaType, externalId, db = pool) {
+  await db.query(
+    `INSERT INTO public.media_sources (media_id, provider, provider_media_type, external_id)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (provider, provider_media_type, external_id) DO NOTHING`,
+    [mediaId, provider, mediaType, String(externalId)]
+  );
+}
+
+/**
+ * The same title may be reached through different providers (TMDB normally; TVMaze / TheTVDB when TMDB is
+ * unreachable). It must still be ONE title for the user, so a record that has no source row yet is matched to
+ * an existing title before a new one is created:
+ *   - same IMDb id (certain), or
+ *   - exactly the same title (case-insensitive) AND the same release year (and nothing else matches)
+ * A candidate that is already linked to a DIFFERENT record of this same provider is never used (two distinct
+ * TMDB entries are two titles). Returns the id of the single match, or null.
+ */
+async function findUnifiableTitle(client, media) {
+  if (media.provider === 'ANILIST' || !['TV', 'MOVIE'].includes(media.mediaType)) return null;
+  const imdb = media.externalIds?.imdb ?? null;
+  const year = Number.isInteger(media.releaseYear) ? media.releaseYear : null;
+  const { rows } = await client.query(
+    `SELECT mi.id
+       FROM public.media_items mi
+      WHERE mi.media_type = $1
+        AND (
+              ($2::text IS NOT NULL AND mi.metadata->'externalIds'->>'imdb' = $2::text)
+           OR ($4::int IS NOT NULL AND LOWER(mi.title) = LOWER($3) AND EXTRACT(YEAR FROM mi.release_date)::int = $4::int)
+        )
+        AND NOT EXISTS (SELECT 1 FROM public.media_sources s WHERE s.media_id = mi.id AND s.provider = $5)
+      LIMIT 2`,
+    [media.mediaType, imdb, media.title, year, media.provider]
+  );
+  return rows.length === 1 ? rows[0].id : null;
+}
+
 export async function upsertMediaFromDetails(media, db = pool) {
   if (!media?.provider || !media?.externalId || !media?.mediaType || !media?.title) {
     throw new Error('upsertMediaFromDetails requires provider, externalId, mediaType and title.');
@@ -36,7 +80,11 @@ export async function upsertMediaFromDetails(media, db = pool) {
     nextAiringEpisode: media.nextAiring?.episode ?? null,
     nextAirDate: media.nextEpisode?.airDate ?? null,
     nextAirEpisode: media.nextEpisode?.episode ?? null,
-    nextAirSeason: media.nextEpisode?.season ?? null
+    nextAirSeason: media.nextEpisode?.season ?? null,
+    ...(media.externalIds ? { externalIds: media.externalIds } : {}),
+    dataSource: media.dataSource ?? media.provider,
+    // The whole normalized record, so a later visit can be served from the database (catalogSnapshot.service.js)
+    snapshot: { savedAt: Date.now(), media: withoutLinks(media) }
   };
 
   const client = await db.connect();
@@ -65,12 +113,33 @@ export async function upsertMediaFromDetails(media, db = pool) {
     ];
 
     let mediaId;
+    let unified = false;
     if (existing.rows.length > 0) {
       mediaId = existing.rows[0].media_id;
+    } else {
+      mediaId = await findUnifiableTitle(client, media);
+      if (mediaId) {
+        unified = true;
+        await client.query(
+          `INSERT INTO public.media_sources (media_id, provider, provider_media_type, external_id) VALUES ($1, $2, $3, $4)
+           ON CONFLICT (provider, provider_media_type, external_id) DO NOTHING`,
+          [mediaId, media.provider, media.mediaType, media.externalId]
+        );
+      }
+    }
+    // A record found by identity is refreshed; one matched to an existing title only refreshes it when the
+    // newcomer is the primary source (TMDB), never when a thinner fallback record would overwrite richer data.
+    const refreshExisting = mediaId && (!unified || media.provider === 'TMDB');
+    if (mediaId && !refreshExisting) {
+      await client.query('COMMIT');
+      return mediaId;
+    }
+    if (mediaId) {
       await client.query(
         `UPDATE public.media_items
             SET title = $1, original_title = $2, overview = $3, poster_path = $4, backdrop_path = $5,
-                release_date = $6, source_rating = $7, popularity = $8, metadata = $9::jsonb
+                release_date = $6, source_rating = $7, popularity = $8,
+                metadata = COALESCE(metadata, '{}'::jsonb) || $9::jsonb
           WHERE id = $10`,
         [...fields, mediaId]
       );
@@ -92,6 +161,15 @@ export async function upsertMediaFromDetails(media, db = pool) {
     }
 
     await syncGenres(client, mediaId, media.genres ?? []);
+
+    for (const other of media.alsoKnownAs ?? []) {
+      await client.query(
+        `INSERT INTO public.media_sources (media_id, provider, provider_media_type, external_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (provider, provider_media_type, external_id) DO NOTHING`,
+        [mediaId, other.provider, other.mediaType ?? media.mediaType, String(other.externalId)]
+      );
+    }
 
     await client.query('COMMIT');
     return mediaId;

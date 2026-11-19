@@ -60,5 +60,9 @@ export function createRateLimiter({ name, windowMs = 60_000, max }) {
 
 /** 60 requests / minute / IP: protects the provider quotas behind search and trending. */
 export const mediaDiscoveryLimiter = createRateLimiter({ name: 'media-discovery', max: 60 });
+/** Sign-in/identity endpoints: 60 / minute / IP (a page load needs 1) blocks token-guessing floods. */
+export const authLimiter = createRateLimiter({ name: 'auth', max: 60 });
+/** A generous ceiling for the whole API (600 / minute / IP): stops scripted hammering, never a person. */
+export const apiLimiter = createRateLimiter({ name: 'api', max: 600 });
 /** 30 requests / minute / IP for the (unauthenticated-capable) username availability lookup. */
 export const usernameCheckLimiter = createRateLimiter({ name: 'username-availability', max: 30 });
