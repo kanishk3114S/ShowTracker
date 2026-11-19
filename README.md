@@ -55,14 +55,18 @@ Real captures of the running app (live AniList and TMDB data).
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/trending.jpg" alt="Trending page with a featured hero and a poster grid" /></td>
-    <td width="50%"><img src="docs/screenshots/explore.jpg" alt="Explore page showing search results for Naruto" /></td>
+    <td width="50%"><img src="docs/screenshots/trending.jpg" alt="Trending page: a featured hero framed by 35mm sprocket holes with a ghost kanji watermark, an AIRING pill and a laurel-rimmed rating" /></td>
+    <td width="50%"><img src="docs/screenshots/explore.jpg" alt="Explore page showing search results for Attack on Titan, with laurel-rimmed ratings on titles rated 8.5 and up" /></td>
   </tr>
   <tr>
     <td align="center"><sub><b>Trending</b>: TMDB daily/weekly lists and AniList's ranking, with a featured hero</sub></td>
     <td align="center"><sub><b>Explore</b>: unified search across anime, movies and TV with genre and year filters</sub></td>
   </tr>
 </table>
+
+<img src="docs/screenshots/details.jpg" alt="Title page for a currently airing anime: amber projector glow, a faint 物語 watermark, a rating chip and an AIRING pill" width="100%" />
+
+<sub><b>Title page</b>: amber projector glow, a ghost <code>『物語』</code> watermark, rating chip and a live <code>AIRING · 12 EPS</code> broadcast pill</sub>
 
 ### On your phone
 
