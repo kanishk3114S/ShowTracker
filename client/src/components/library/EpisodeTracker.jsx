@@ -31,7 +31,7 @@ const todayIso = () => new Date().toISOString().slice(0, 10);
  *
  * Props: entry, mediaId, watchedIds (Set), onLocalChange(ids, watched, delta), onProgress(summary, ids, watched)
  */
-export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChange, onProgress }) {
+export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChange, onProgress, initialSeason }) {
   const { data, error, loading, reload } = useResource(R.seasons(mediaId));
   const [chosenSeason, setChosenSeason] = useState(null);
   const [pending, setPending] = useState(() => new Set());
@@ -43,7 +43,9 @@ export default function EpisodeTracker({ entry, mediaId, watchedIds, onLocalChan
 
   const seasons = data?.seasons ?? [];
   const activeId =
-    seasons.find((s) => s.id === chosenSeason)?.id ?? (seasons.find((s) => s.seasonNumber > 0) ?? seasons[0])?.id;
+    seasons.find((s) => s.id === chosenSeason)?.id ??
+    seasons.find((s) => initialSeason && s.seasonNumber === initialSeason)?.id ?? // opened from a sequel's page: start on that season
+    (seasons.find((s) => s.seasonNumber > 0) ?? seasons[0])?.id;
   const season = seasons.find((s) => s.id === activeId);
 
   // Total across every regular season (a franchise has several); the entry's own number can lag behind a fresh sync.

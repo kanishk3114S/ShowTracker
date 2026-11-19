@@ -27,6 +27,7 @@ const { resolveFranchise, planAnimeSeasons, MAX_FRANCHISE_SEASONS, resetFranchis
 );
 const anilistProvider = await import('../src/providers/anilist.provider.js');
 const { default: realApp } = await import('../src/app.js');
+const { getMediaDetails } = await import('../src/services/mediaCatalog.service.js');
 
 const admin = migrationPool;
 const user = crypto.randomUUID();
@@ -417,4 +418,43 @@ test('AniList raw query includes the fields the franchise and radar features dep
   assert.match(seen, /nextAiringEpisode \{ episode airingAt timeUntilAiring \}/);
   await anilistProvider.getAnimeDetails(1);
   assert.match(seen, /nextAiringEpisode \{ episode airingAt timeUntilAiring \}/);
+});
+
+test('series-wise tracking: the page of a sequel points at the ROOT entry, so adding it tracks the whole series once', async () => {
+  const ids = buildAot(991600000);
+  const rootPage = await getMediaDetails({ provider: 'ANILIST', mediaType: 'ANIME', externalId: String(ids.s1) });
+  assert.ok(rootPage.catalogId);
+  assert.equal(rootPage.series, undefined, 'the first season tracks itself');
+
+  const s3Page = await getMediaDetails({ provider: 'ANILIST', mediaType: 'ANIME', externalId: String(ids.s3) });
+  assert.ok(s3Page.catalogId && s3Page.catalogId !== rootPage.catalogId, 'the sequel still has its own catalog row');
+  assert.deepEqual(s3Page.series, {
+    rootExternalId: String(ids.s1),
+    rootTitle: 'ZZTEST F Titan',
+    rootCatalogId: rootPage.catalogId,
+    seasonNumber: 3,
+    totalSeasons: 4
+  });
+
+  // what the client does from the Season 3 page: add the ROOT, then everything counts toward one entry
+  const added = await api('post', '', { mediaId: s3Page.series.rootCatalogId, status: 'WATCHING' });
+  assert.equal(added.status, 201);
+  assert.equal(added.body.data.media.title, 'ZZTEST F Titan');
+  await syncSeasonsAndEpisodes(rootPage.catalogId);
+  const { seasons } = await getSeasonsForMedia(rootPage.catalogId);
+  for (const ep of seasons[0].episodes.slice(0, 12)) await api('post', `/${added.body.data.id}/episodes/${ep.id}/watched`);
+  const entry = (await api('get', `/check/${rootPage.catalogId}`)).body.data.entry;
+  assert.equal(entry.watchedEpisodesCount, 12);
+  assert.equal(entry.totalEpisodes, 65, '12 / 65 for the whole series');
+  const library = await api('get', '');
+  assert.equal(library.body.data.filter((e) => e.media.title.startsWith('ZZTEST F Titan') && e.mediaId === rootPage.catalogId).length, 1, 'one entry for the series');
+  assert.equal((await api('get', `/check/${s3Page.catalogId}`)).body.data.entry, null, 'the lone sequel row is not tracked');
+});
+
+test('series lookup failure degrades gracefully: the sequel page still works and tracks itself', async () => {
+  const ids = buildAot(991700000);
+  failIds = new Set([String(ids.s1)]); // the root cannot be loaded
+  const page = await getMediaDetails({ provider: 'ANILIST', mediaType: 'ANIME', externalId: String(ids.s2) });
+  assert.ok(page.catalogId);
+  assert.equal(page.series, undefined);
 });

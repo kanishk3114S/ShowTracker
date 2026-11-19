@@ -2,6 +2,7 @@ import * as anilist from '../providers/anilist.provider.js';
 import * as tmdb from '../providers/tmdb.provider.js';
 import { ProviderError } from '../providers/providerError.js';
 import { normalizeAniListMedia, normalizeTmdbMedia, compact } from './mediaNormalizer.js';
+import { getFranchiseSummary } from './franchise.service.js';
 import { upsertMediaFromDetails } from './mediaPersistence.service.js';
 import { TTLCache } from '../utils/ttlCache.js';
 
@@ -208,6 +209,33 @@ export async function getTrendingMedia({ type, window, page }) {
 
 // ----------------------------------------------------------------- details --
 
+/**
+ * Anime are tracked SERIES-wise: every season is one linked AniList entry, and the whole series lives
+ * under its first season. For a sequel this returns where it belongs, so tracking from its page adds
+ * (and updates) the one series entry instead of a lone season:
+ *   { rootExternalId, rootTitle, rootCatalogId, seasonNumber, totalSeasons }
+ * Returns null for the first season, standalone anime, or when the lookup is unavailable (the page
+ * then simply tracks the title on its own).
+ */
+async function resolveSeries(externalId) {
+  try {
+    const franchise = await getFranchiseSummary(externalId);
+    if (!franchise.isFranchise || franchise.isRoot || !franchise.root) return null;
+    const root = await getMediaDetails({ provider: 'ANILIST', mediaType: 'ANIME', externalId: franchise.root.externalId });
+    if (!root.catalogId) return null;
+    return {
+      rootExternalId: franchise.root.externalId,
+      rootTitle: franchise.root.title,
+      rootCatalogId: root.catalogId,
+      seasonNumber: franchise.seasonNumber,
+      totalSeasons: franchise.totalSeasons
+    };
+  } catch (err) {
+    console.warn(`[MediaCatalog] Series lookup failed for AniList ${externalId}:`, err.message);
+    return null;
+  }
+}
+
 export async function getMediaDetails({ provider, mediaType, externalId, refresh = false }) {
   const key = `details:${provider}:${mediaType}:${externalId}`;
   return cache.getOrLoad(
@@ -241,7 +269,8 @@ export async function getMediaDetails({ provider, mediaType, externalId, refresh
           console.error('[MediaCatalog] Could not persist media to catalog:', err.message);
         }
       }
-      return { ...media, catalogId };
+      const series = provider === 'ANILIST' && mediaType === 'ANIME' ? await resolveSeries(externalId) : null;
+      return series ? { ...media, catalogId, series } : { ...media, catalogId };
     },
     { refresh }
   );

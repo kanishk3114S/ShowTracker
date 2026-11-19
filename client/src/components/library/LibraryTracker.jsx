@@ -18,6 +18,17 @@ import { useSignIn } from '../auth/SignInContext';
 
 const ADD_CHOICES = ['PLAN_TO_WATCH', 'WATCHING', 'COMPLETED'];
 
+/** Shown on a sequel's page: your library holds ONE entry for the whole series, with every season in it. */
+function SeriesNote({ series }) {
+  if (!series) return null;
+  return (
+    <p className="mt-1.5 text-sm text-fg-muted">
+      This is Season {series.seasonNumber} of <span className="font-semibold text-fg">{series.rootTitle}</span>. Your library tracks the whole
+      series ({series.totalSeasons} seasons) as one title.
+    </p>
+  );
+}
+
 function NotesDialog({ open, initial, busy, onClose, onSave }) {
   const [draft, setDraft] = useState(initial ?? '');
   useEffect(() => {
@@ -66,7 +77,9 @@ export default function LibraryTracker({ media }) {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { openSignIn } = useSignIn();
   const { toast } = useToast();
-  const mediaId = media.catalogId;
+  // Anime are tracked series-wise: a sequel's page tracks the whole series under its first season.
+  const series = media.series ?? null;
+  const mediaId = series?.rootCatalogId ?? media.catalogId;
   const isMovie = media.mediaType === 'MOVIE';
 
   const check = useResource(R.checkEntry(mediaId), { enabled: Boolean(isAuthenticated && mediaId) });
@@ -199,6 +212,7 @@ export default function LibraryTracker({ media }) {
     return (
       <Card className={panel}>
         <h2 className="text-base font-semibold text-fg">Your library</h2>
+        <SeriesNote series={series} />
         {isMovie ? (
           <div className="mt-4 flex flex-wrap gap-2">
             <Button variant="primary" leftIcon={Check} loading={busy} onClick={() => add('COMPLETED')}>
@@ -237,6 +251,7 @@ export default function LibraryTracker({ media }) {
           <h2 className="text-base font-semibold text-fg">Your library</h2>
           <StatusBadge status={entry.status} />
         </div>
+        <SeriesNote series={series} />
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {isMovie ? (
@@ -333,7 +348,7 @@ export default function LibraryTracker({ media }) {
 
       {!isMovie && (
         <div className="max-w-3xl">
-          <EpisodeTracker entry={entry} mediaId={mediaId} watchedIds={watchedIds} onLocalChange={onLocalChange} onProgress={onProgress} />
+          <EpisodeTracker entry={entry} mediaId={mediaId} watchedIds={watchedIds} onLocalChange={onLocalChange} onProgress={onProgress} initialSeason={series?.seasonNumber} />
         </div>
       )}
 

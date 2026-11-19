@@ -3,6 +3,7 @@ import { withUserTransaction } from '../../db/withUserTransaction.js';
 import * as service from './library.service.js';
 import { getOwnerStats } from './library.stats.js';
 import { getUpcoming } from './radar.service.js';
+import { getSeasonsForMedia } from '../../services/episodeCatalog.service.js';
 import {
   addLibrarySchema,
   updateLibrarySchema,
@@ -46,10 +47,18 @@ export const check = handler(
   { readOnly: true }
 );
 
-export const add = handler(
-  (client, req) => service.addEntry(client, req.user.id, parse(addLibrarySchema, req.body)),
-  201
-);
+export const add = async (req, res, next) => {
+  try {
+    const body = parse(addLibrarySchema, req.body);
+    const data = await withUserTransaction(req.user.id, (client) => service.addEntry(client, req.user.id, body));
+    // Anime are tracked as a whole series: load every season in the background so totals (e.g. 12 / 49) are right
+    // from the first library view. Best effort; the episode tracker triggers the same (de-duplicated) sync.
+    if (data.media.mediaType === 'ANIME' && process.env.NODE_ENV !== 'test') getSeasonsForMedia(data.mediaId).catch(() => {});
+    res.set('Cache-Control', 'private, no-store').status(201).json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
 
 export const update = handler((client, req) =>
   service.updateEntry(client, req.user.id, parse(entryParamsSchema, req.params).id, parse(updateLibrarySchema, req.body))
