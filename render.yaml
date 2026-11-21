@@ -1,13 +1,17 @@
-# Render Blueprint: one API (web service) + one static site for the React app.
+# Render Blueprint: ONE unified web service. Express serves the built React app AND the /api routes
+# from the same address, so the site cannot load without the backend (and there is no CORS to configure).
 # Dashboard: New > Blueprint > pick this repo. Fill in every value marked "sync: false".
+#
+# Free plan: the service sleeps after ~15 min without traffic. To keep it awake, point an uptime monitor
+# (UptimeRobot, 5 min interval) at https://<your-service>.onrender.com/api/health, or use a paid plan
+# (change `plan: free` to `plan: starter`). See README > Deployment.
 services:
-  # ---------------------------------------------------------------- API
   - type: web
-    name: showtracker-api
+    name: showtracker
     runtime: node
-    rootDir: server
     plan: free
-    buildCommand: npm install
+    # Installs and builds the client (devDependencies are needed by Vite), then installs the server.
+    buildCommand: npm run build
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -17,9 +21,7 @@ services:
         value: production
       - key: TRUST_PROXY
         value: 1
-      # The https:// address of the static site below, for example https://showtracker-web.onrender.com
-      - key: CLIENT_URL
-        sync: false
+      # ---- server-side secrets (never exposed to the browser)
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_PUBLISHABLE_KEY
@@ -32,45 +34,9 @@ services:
       # Optional: TheTVDB key, the second fallback when TMDB is slow (TVMaze needs none)
       - key: TVDB_API_KEY
         sync: false
-
-  # ------------------------------------------------------------ Frontend
-  - type: web
-    name: showtracker-web
-    runtime: static
-    rootDir: client
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    # Single-page app: every path must serve index.html (without this, refreshing /explore is a 404)
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    headers:
-      - path: /*
-        name: Content-Security-Policy
-        value: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://image.tmdb.org https://s4.anilist.co https://static.tvmaze.com https://artworks.thetvdb.com https://*.supabase.co https://lh3.googleusercontent.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.onrender.com https://*.up.railway.app; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
-      - path: /*
-        name: Permissions-Policy
-        value: "camera=(), microphone=(), geolocation=()"
-      - path: /*
-        name: X-Frame-Options
-        value: DENY
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-      - path: /*
-        name: Referrer-Policy
-        value: strict-origin-when-cross-origin
-      - path: /*
-        name: Strict-Transport-Security
-        value: max-age=31536000; includeSubDomains; preload
-    # VITE_* values are baked in at BUILD time: change one, then redeploy (a restart is not enough)
-    envVars:
-      - key: NODE_VERSION
-        value: 22
-      # The https:// address of the API service WITH /api, for example https://showtracker-api.onrender.com/api
-      - key: VITE_API_URL
-        sync: false
+      # ---- build-time values for the React app (public by design; baked in when `npm run build` runs).
+      # Change one, then trigger a NEW deploy: a restart is not enough.
+      # Do NOT set VITE_API_URL: the app then calls the same origin at /api.
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_PUBLISHABLE_KEY

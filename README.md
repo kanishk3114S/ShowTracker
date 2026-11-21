@@ -257,7 +257,7 @@ npm run dev          # backend (nodemon) + frontend together
 
 ## 🚢 Deployment
 
-ShowTracker is two small apps plus Supabase: a **static React frontend** (Vercel or Netlify), an **Express API** (Render or Railway) and your **Supabase project** (database, auth, storage).
+ShowTracker deploys as **one Render web service** (Express serves the React build and the API) plus your **Supabase project** (database, auth, storage). A split frontend/API deployment still works if you set `VITE_API_URL` and `CLIENT_URL`.
 
 ### Hardening that ships with the API
 
@@ -296,23 +296,29 @@ TMDB is the primary source. When it is slow or failing (timeout, dropped connect
 | **Errors** | In production, unexpected errors (database, bugs) return a generic message: no SQL, paths or stacks. Deliberate errors keep their clear message. |
 | **Resilience** | TMDB timeout 12 s with one jittered retry; title pages are served from the database snapshot while it is fresh (20 min airing, 6 h otherwise) and fall back to a stale copy when the provider is down. |
 
-### Deploying both on Render (Blueprint)
+### Deploying on Render (one unified service)
 
-[`render.yaml`](render.yaml) describes both services. In Render: **New > Blueprint**, pick this repo, then fill the variables marked `sync: false`:
+Express serves the built React app **and** the `/api` routes from the same address, so the site cannot load without the backend, and no CORS setup is needed. [`render.yaml`](render.yaml) describes the single service. In Render: **New > Blueprint**, pick this repo, then fill the variables marked `sync: false`:
 
-| Service | Variable | Value |
-|---|---|---|
-| API (`showtracker-api`) | `CLIENT_URL` | the frontend's address, `https://<your-web>.onrender.com` |
-| API | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL`, `TMDB_API_READ_ACCESS_TOKEN` | as in `server/.env.example` |
-| Web (`showtracker-web`) | `VITE_API_URL` | the API's address **plus `/api`**, `https://<your-api>.onrender.com/api` |
-| Web | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SITE_URL` | your Supabase values and the web address |
+| Variable | Value |
+|---|---|
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL`, `TMDB_API_READ_ACCESS_TOKEN` | as in `server/.env.example` (`TVDB_API_KEY` is optional) |
+| `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | the same Supabase URL and publishable key (public by design, baked in at build) |
+| `VITE_SITE_URL` | the service address, `https://<your-service>.onrender.com` |
+| `VITE_API_URL` | **leave unset**: the app then calls `/api` on its own origin |
 
-**If the deployed site shows no data or a blank page, check these in order:**
-1. A static site needs the rewrite `/*` to `/index.html` (the blueprint sets it; in the dashboard it is *Redirects/Rewrites*). Without it, refreshing any page except `/` fails.
-2. `VITE_*` values are baked in at **build** time: after changing one, trigger a **new deploy** (a restart is not enough). A build without them now shows a "not configured yet" page listing what is missing instead of an empty app.
-3. `CLIENT_URL` on the API must be the exact `https://` address of the frontend, or the browser blocks every API call (CORS). The API logs a warning at startup when it is missing.
-4. Render's free API sleeps when idle: the first request can take about 30 seconds.
-5. The `_headers` and `vercel.json` files are for Netlify and Vercel; on Render the headers come from the blueprint.
+Build command `npm run build` (installs and builds the client, then installs the server); start command `npm start`; health check `/api/health`.
+
+**If the deployed site shows a blank page or no data, check in order:**
+1. `VITE_*` values are baked in at **build** time: after changing one, trigger a **new deploy** (a restart is not enough). A build without them shows a "not configured yet" page listing what is missing.
+2. `VITE_API_URL` must be unset (or the full `https://.../api` of another host). A `localhost` value is reported on the page.
+3. Supabase Auth must know the address: *Authentication > URL Configuration*, Site URL = your service address, plus `https://<your-service>.onrender.com/**` in Redirect URLs.
+4. The `_headers` and `vercel.json` files in `client/` are only for hosting the frontend separately; in the unified setup Express sends the headers.
+
+### Keeping it awake (no cold starts, no paused database)
+
+- **Render free plan** sleeps after ~15 minutes without traffic (the first request then takes ~30 s). Create a free [UptimeRobot](https://uptimerobot.com) HTTP monitor on `https://<your-service>.onrender.com/api/health` every 5 minutes. The service stays up; a free instance has ~750 hours a month, enough for one always-on service. For guaranteed uptime use a paid instance (`plan: starter`).
+- **Supabase free** projects pause after about a week without activity. `/api/health` runs a real database query, so the monitor above also keeps the project active. [`.github/workflows/keepalive.yml`](.github/workflows/keepalive.yml) is a second safety net (every 6 hours); set the repository variable `RENDER_APP_URL` to your service address.
 
 ### 1. Database (Supabase)
 
@@ -325,7 +331,7 @@ TMDB is the primary source. When it is slow or failing (timeout, dropped connect
 
 3. **Storage check:** *Supabase Dashboard → Storage* shows a bucket named `avatars` marked **Public**. Migration 006 creates it; if your role could not, create it by hand (public, 5 MB limit, `image/jpeg`, `image/png`, `image/webp`) and add the four owner-folder policies from the migration.
 
-### 2. Backend on Render (or Railway)
+### 2. (Split deployment only) Backend on Render or Railway
 
 | Setting | Value |
 |---|---|
@@ -336,7 +342,7 @@ TMDB is the primary source. When it is slow or failing (timeout, dropped connect
 
 Environment variables (see [`server/.env.example`](server/.env.example)): `NODE_ENV=production`, `CLIENT_URL=https://<your-frontend>.vercel.app`, `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL` (the restricted `showtracker_app` pooler URI), `TMDB_API_READ_ACCESS_TOKEN`. Render sets `PORT` itself. Do **not** add the service-role key or `MIGRATION_DATABASE_URL`.
 
-### 3. Frontend on Vercel (or Netlify)
+### 3. (Split deployment only) Frontend on Vercel or Netlify
 
 | Setting | Value |
 |---|---|

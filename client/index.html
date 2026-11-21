@@ -32,13 +32,14 @@
     <link rel="dns-prefetch" href="https://uxjbiiurqmjghsdoqheb.supabase.co" />
     <link rel="dns-prefetch" href="https://artworks.thetvdb.com" />
     <link rel="dns-prefetch" href="https://api.anilist.co" />
-    <!-- Non-blocking font load: preload the CSS as a stylesheet only after render (font-display:swap prevents FOIT) -->
+    <!-- Non-blocking font load: the CSS is fetched early (preload) and applied by /font-loader.js, an external script,
+         because inline onload="" handlers are forbidden by the Content-Security-Policy. font-display:swap prevents FOIT. -->
     <link
       rel="preload"
       as="style"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <script src="/font-loader.js" defer></script>
     <noscript>
       <link
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"

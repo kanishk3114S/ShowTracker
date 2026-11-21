@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-import app from './app.js';
+import app, { servesClient } from './app.js';
 import { checkDatabaseConnection, closePool, warmPool, startPoolKeepAlive } from './config/database.js';
 import * as tmdb from './providers/tmdb.provider.js';
 
@@ -16,7 +16,7 @@ const PORT = parseInt(process.env.PORT || '5000', 10);
 
 // Browsers only talk to this API from the origins in CLIENT_URL. Forgetting it in production is the most common
 // reason a deployed frontend loads but shows no data (every request is blocked by CORS), so say so loudly.
-if (process.env.NODE_ENV === 'production' && !/^https:\/\//i.test(process.env.CLIENT_URL || '')) {
+if (process.env.NODE_ENV === 'production' && !servesClient && !/^https:\/\//i.test(process.env.CLIENT_URL || '')) {
   console.warn('⚠️  CLIENT_URL is not set to the https:// address of your frontend. Browsers will block every API call (CORS).');
 }
 
