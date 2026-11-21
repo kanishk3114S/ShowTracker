@@ -5,7 +5,7 @@
  */
 const env = import.meta.env;
 
-export const API_BASE_URL = env.VITE_API_URL || (env.DEV ? 'http://localhost:5000/api' : '');
+export const API_BASE_URL = env.VITE_API_URL || (env.DEV ? 'http://localhost:5000/api' : '/api');
 
 const looksLocal = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test(url || '');
 
@@ -13,8 +13,9 @@ const looksLocal = (url) => /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])/i.test
 export function findConfigProblems() {
   if (env.DEV) return [];
   const problems = [];
-  if (!env.VITE_API_URL) problems.push({ name: 'VITE_API_URL', hint: 'the public URL of your API, ending in /api (for example https://showtracker-api.onrender.com/api)' });
-  else if (looksLocal(env.VITE_API_URL) && !looksLocal(window.location.origin)) problems.push({ name: 'VITE_API_URL', hint: 'it points at localhost, which visitors cannot reach' });
+  if (env.VITE_API_URL && looksLocal(env.VITE_API_URL) && !looksLocal(window.location.origin)) {
+    problems.push({ name: 'VITE_API_URL', hint: 'it points at localhost, which visitors cannot reach' });
+  }
   if (!env.VITE_SUPABASE_URL) problems.push({ name: 'VITE_SUPABASE_URL', hint: 'your Supabase project URL' });
   if (!env.VITE_SUPABASE_PUBLISHABLE_KEY) problems.push({ name: 'VITE_SUPABASE_PUBLISHABLE_KEY', hint: 'your Supabase publishable (anon) key' });
   return problems;

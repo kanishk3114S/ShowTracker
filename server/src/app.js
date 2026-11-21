@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import healthRoutes from './modules/health/health.routes.js';
 import authRoutes from './modules/auth/auth.routes.js';
 import profileRoutes from './modules/profiles/profiles.routes.js';
@@ -12,6 +15,10 @@ import { optionalAuth } from './middleware/requireAuth.js';
 import { mediaDiscoveryLimiter, usernameCheckLimiter, authLimiter, apiLimiter } from './middleware/rateLimit.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDistPath = path.resolve(__dirname, '../../client/dist');
+
 const app = express();
 
 // Behind a reverse proxy (Render, Railway, ...) the real client IP is in X-Forwarded-For.
@@ -20,16 +27,30 @@ const trustProxy = process.env.TRUST_PROXY ?? (process.env.NODE_ENV === 'product
 if (trustProxy) app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy === 'true');
 app.disable('x-powered-by');
 
-// Security headers with Helmet. This server only returns JSON, so its CSP forbids loading or
-// embedding anything at all; the React app is a separate origin with its own hosting headers.
+// Security headers with Helmet configured for the full application.
 app.use(
   helmet({
     contentSecurityPolicy: {
-      useDefaults: false,
       directives: {
-        defaultSrc: ["'none'"],
-        baseUri: ["'none'"],
-        formAction: ["'none'"],
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "blob:",
+          "https://image.tmdb.org",
+          "https://s4.anilist.co",
+          "https://static.tvmaze.com",
+          "https://artworks.thetvdb.com",
+          "https://*.supabase.co",
+          "https://lh3.googleusercontent.com"
+        ],
+        connectSrc: ["'self'", "https://*.supabase.co", "wss://*.supabase.co"],
+        fontSrc: ["'self'", "https://fonts.gstatic.com"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
         frameAncestors: ["'none'"]
       }
     },
@@ -82,22 +103,52 @@ app.use('/api/library', libraryRoutes);
 // Direct /api/users/:username route for public profile lookup
 app.get('/api/users/:username', optionalAuth, getPublicProfile);
 
-// Root route notice
-app.get('/', (req, res) => {
-  res.json({
-    message: 'ShowTracker API is active. Health check available at /api/health',
-    endpoints: {
-      health: '/api/health',
-      auth: '/api/auth/me',
-      profile: '/api/profiles/me',
-      availability: '/api/profiles/username-availability',
-      publicUser: '/api/users/:username'
-    }
-  });
-});
+// Any unknown /api/* route returns structured 404 JSON
+app.use('/api', notFoundHandler);
 
-// Centralized 404 & Error Handling
-app.use(notFoundHandler);
+// Unified Frontend Hosting: serve client/dist if built
+if (fs.existsSync(clientDistPath)) {
+  // Vite static assets with 1-year immutable caching
+  app.use(
+    '/assets',
+    express.static(path.join(clientDistPath, 'assets'), {
+      maxAge: '1y',
+      immutable: true
+    })
+  );
+
+  // Other public static files (favicon, manifest, etc.)
+  app.use(express.static(clientDistPath, { index: false, maxAge: '1h' }));
+
+  // Root and SPA routes serve index.html
+  app.get('/', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+
+  app.get('*', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+} else {
+  // Standalone API notice (fallback when client is not built)
+  app.get('/', (req, res) => {
+    res.json({
+      message: 'ShowTracker API is active. Health check available at /api/health',
+      endpoints: {
+        health: '/api/health',
+        auth: '/api/auth/me',
+        profile: '/api/profiles/me',
+        availability: '/api/profiles/username-availability',
+        publicUser: '/api/users/:username'
+      }
+    });
+  });
+
+  app.use(notFoundHandler);
+}
+
+// Centralized Error Handling
 app.use(errorHandler);
 
 export default app;

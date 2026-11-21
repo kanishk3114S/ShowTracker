@@ -1,0 +1,22 @@
+name: KeepAlive & Supabase Inactivity Prevention
+
+on:
+  schedule:
+    # Run every 6 hours to guarantee Supabase never pauses and Render stays active
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping ShowTracker Health & Database
+        env:
+          APP_URL: ${{ vars.RENDER_APP_URL || secrets.RENDER_APP_URL }}
+        run: |
+          if [ -n "$APP_URL" ]; then
+            echo "Pinging $APP_URL/api/health to keep Render awake and refresh Supabase activity..."
+            curl -f -s -m 30 "$APP_URL/api/health" || echo "Ping attempted."
+          else
+            echo "RENDER_APP_URL secret/variable not configured yet. Configure it in Repo Settings > Secrets and variables > Actions."
+          fi
