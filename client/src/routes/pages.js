@@ -13,6 +13,7 @@ export const pageLoaders = {
   Trending: () => import('../pages/Trending/Trending'),
   MediaDetails: () => import('../pages/MediaDetails/MediaDetails'),
   Library: () => import('../pages/Library/Library'),
+  Upcoming: () => import('../pages/Upcoming/Upcoming'),
   PublicProfile: () => import('../pages/PublicProfile/PublicProfile'),
   Settings: () => import('../pages/Settings/Settings'),
   Credits: () => import('../pages/Credits/Credits'),
@@ -24,6 +25,7 @@ const ROUTES = [
   ['/explore', 'Explore'],
   ['/trending', 'Trending'],
   ['/library', 'Library'],
+  ['/upcoming', 'Upcoming'],
   ['/settings', 'Settings'],
   ['/media/', 'MediaDetails'],
   ['/u/', 'PublicProfile'],
@@ -43,6 +45,8 @@ export function prefetchRouteData(pathname, isAuthenticated) {
     [R.stats(), R.continueWatching(), R.recentlyUpdated(), R.upcoming()].forEach(prefetchResource);
   } else if (pathname.startsWith('/library') && isAuthenticated) {
     [R.library(), R.stats(), R.groups()].forEach(prefetchResource);
+  } else if (pathname.startsWith('/upcoming') && isAuthenticated) {
+    prefetchResource(R.upcoming());
   } else if (pathname.startsWith('/explore')) {
     [R.search(), R.genres('ALL')].forEach(prefetchResource);
   } else if (pathname.startsWith('/trending')) {

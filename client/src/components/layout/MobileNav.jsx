@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Compass, Flame, Home, Library, LayoutDashboard, UserRound, LogIn } from 'lucide-react';
+import { CalendarClock, Compass, Flame, Home, Library, LayoutDashboard, UserRound, LogIn } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useSignIn } from '../auth/SignInContext';
 import { prefetchNav } from '../../routes/pages';
@@ -35,6 +35,9 @@ export default function MobileNav() {
             </NavLink>
             <NavLink to="/library" className={itemClass} onTouchStart={() => prefetchNav('/library', isAuthenticated)}>
               <Library className="h-5 w-5" aria-hidden="true" /> Library
+            </NavLink>
+            <NavLink to="/upcoming" className={itemClass} onTouchStart={() => prefetchNav('/upcoming', isAuthenticated)}>
+              <CalendarClock className="h-5 w-5" aria-hidden="true" /> Upcoming
             </NavLink>
             <NavLink to={profile?.username ? `/u/${profile.username}` : '/settings'} className={itemClass}>
               <UserRound className="h-5 w-5" aria-hidden="true" /> Profile

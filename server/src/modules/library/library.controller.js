@@ -96,7 +96,8 @@ export const stats = handler((client, req) => getOwnerStats(client, req.user.id)
  */
 export const upcoming = async (req, res, next) => {
   try {
-    const data = await getUpcoming(req.user.id);
+    const allEpisodes = req.query.single !== 'true' && req.query.radar !== 'true';
+    const data = await getUpcoming(req.user.id, { allEpisodes });
     res.set('Cache-Control', 'private, no-store').json({ success: true, data });
   } catch (err) {
     next(err);

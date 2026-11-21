@@ -180,8 +180,8 @@ export default function ReleaseRadar({ compact = false, limit = 4 }) {
             <span className="h-5 w-1 rounded-full bg-accent" aria-hidden="true" />
             Release radar
           </h2>
-          <Link to="/library?view=radar" className="text-sm font-semibold text-accent transition hover:text-accent-hover">
-            Full radar
+          <Link to="/upcoming" className="text-sm font-semibold text-accent transition hover:text-accent-hover">
+            View all upcoming
           </Link>
         </div>
       )}
@@ -205,7 +205,7 @@ export default function ReleaseRadar({ compact = false, limit = 4 }) {
         </section>
       ))}
       {compact && items.length > shown.length && (
-        <Link to="/library?view=radar" className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
+        <Link to="/upcoming" className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline">
           {items.length - shown.length} more on the radar <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       )}

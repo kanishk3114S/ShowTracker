@@ -10,6 +10,7 @@ export const getHealth = async (req, res, next) => {
 
     const isHealthy = dbStatus.ok;
     const overallStatus = isHealthy ? 'healthy' : 'degraded';
+    const isProduction = process.env.NODE_ENV === 'production';
 
     const healthReport = {
       success: true,
@@ -20,7 +21,7 @@ export const getHealth = async (req, res, next) => {
       services: {
         server: {
           status: 'healthy',
-          nodeVersion: process.version
+          ...(!isProduction ? { nodeVersion: process.version } : {})
         },
         database: {
           status: dbStatus.ok ? 'connected' : 'disconnected',
@@ -28,13 +29,21 @@ export const getHealth = async (req, res, next) => {
           ...(dbStatus.ok
             ? {
                 serverTime: dbStatus.time,
-                database: dbStatus.database,
-                connectedAs: dbStatus.user,
-                schema: dbStatus.schema
+                ...(!isProduction
+                  ? {
+                      database: dbStatus.database,
+                      connectedAs: dbStatus.user,
+                      schema: dbStatus.schema
+                    }
+                  : {})
               }
             : {
-                error: dbStatus.error,
-                hint: 'Check DATABASE_URL in server/.env or ensure PostgreSQL is running.'
+                ...(!isProduction
+                  ? {
+                      error: dbStatus.error,
+                      hint: 'Check DATABASE_URL in server/.env or ensure PostgreSQL is running.'
+                    }
+                  : { message: 'Database connection is temporarily unavailable.' })
               })
         }
       }

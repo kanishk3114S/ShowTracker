@@ -18,6 +18,7 @@ const Explore = lazy(pageLoaders.Explore);
 const Trending = lazy(pageLoaders.Trending);
 const MediaDetails = lazy(pageLoaders.MediaDetails);
 const Library = lazy(pageLoaders.Library);
+const Upcoming = lazy(pageLoaders.Upcoming);
 const PublicProfile = lazy(pageLoaders.PublicProfile);
 const Settings = lazy(pageLoaders.Settings);
 const Credits = lazy(pageLoaders.Credits);
@@ -79,6 +80,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Library />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/upcoming"
+              element={
+                <ProtectedRoute>
+                  <Upcoming />
                 </ProtectedRoute>
               }
             />

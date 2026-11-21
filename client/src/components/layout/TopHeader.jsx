@@ -15,7 +15,8 @@ export function navItems(isAuthenticated) {
         { to: '/dashboard', label: 'Dashboard' },
         { to: '/explore', label: 'Explore' },
         { to: '/trending', label: 'Trending' },
-        { to: '/library', label: 'My Library' }
+        { to: '/library', label: 'My Library' },
+        { to: '/upcoming', label: 'Upcoming' }
       ]
     : [
         { to: '/explore', label: 'Explore' },

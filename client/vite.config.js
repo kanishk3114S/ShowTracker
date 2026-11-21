@@ -22,6 +22,7 @@ const siteUrlPlugin = {
 export default defineConfig({
   plugins: [react(), siteUrlPlugin],
   build: {
+    sourcemap: false,
     chunkSizeWarningLimit: 500,
     rolldownOptions: {
       output: { codeSplitting: { groups: VENDOR_CHUNKS } },

@@ -44,9 +44,10 @@ const clientOrigins = (process.env.CLIENT_URL || 'http://localhost:5173')
   .split(',')
   .map((o) => o.trim().replace(/\/$/, ''))
   .filter(Boolean);
+const devOrigins = process.env.NODE_ENV === 'production' ? [] : ['http://localhost:5173', 'http://127.0.0.1:5173'];
 app.use(
   cors({
-    origin: [...new Set([...clientOrigins, 'http://localhost:5173', 'http://127.0.0.1:5173'])],
+    origin: [...new Set([...clientOrigins, ...devOrigins])],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
@@ -85,7 +86,6 @@ app.get('/api/users/:username', optionalAuth, getPublicProfile);
 app.get('/', (req, res) => {
   res.json({
     message: 'ShowTracker API is active. Health check available at /api/health',
-    version: '1.0.0',
     endpoints: {
       health: '/api/health',
       auth: '/api/auth/me',

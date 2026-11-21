@@ -110,6 +110,21 @@ const AIRING_QUERY = `
   }
 `;
 
+// All scheduled episodes across multiple anime within a time window in ONE request.
+const AIRING_SCHEDULES_QUERY = `
+  query ($ids: [Int], $now: Int, $end: Int, $perPage: Int) {
+    Page(page: 1, perPage: $perPage) {
+      airingSchedules(mediaId_in: $ids, airingAt_greater: $now, airingAt_lesser: $end, notYetAired: true) {
+        id
+        episode
+        airingAt
+        timeUntilAiring
+        mediaId
+      }
+    }
+  }
+`;
+
 const GENRE_QUERY = 'query { GenreCollection }';
 
 /**
@@ -235,6 +250,23 @@ export async function getAnimeAiringBatch(ids) {
   if (list.length === 0) return [];
   const data = await graphql(AIRING_QUERY, { ids: list, perPage: list.length });
   return data?.Page?.media ?? [];
+}
+
+/** All scheduled episodes for up to 50 anime ids within a unix time window in a single request. */
+export async function getAnimeAiringSchedules(ids, nowSec, endSec) {
+  const list = [...new Set(ids.map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 50);
+  if (list.length === 0) return [];
+  try {
+    const data = await graphql(AIRING_SCHEDULES_QUERY, {
+      ids: list,
+      now: nowSec,
+      end: endSec,
+      perPage: 50
+    });
+    return data?.Page?.airingSchedules ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /** Genre names supported by AniList's `genre` filter. */

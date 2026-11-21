@@ -32,8 +32,8 @@ export async function requireAuth(req, res, next) {
     };
 
     next();
-  } catch (err) {
-    next(new AppError('Authentication verification failed.', 401, 'AUTH_FAILED', err.message));
+  } catch {
+    next(new AppError('Authentication verification failed.', 401, 'AUTH_FAILED'));
   }
 }
 
