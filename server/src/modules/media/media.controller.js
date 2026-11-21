@@ -26,8 +26,8 @@ function parseOrThrow(schema, input, message = 'Validation failed.') {
   return result.data;
 }
 
-// Provider data is public and not user-specific, so shared caches may keep it briefly.
-const PUBLIC_CACHE = 'public, max-age=60';
+// Provider data is public and not user-specific: cache with stale-while-revalidate for instant repeat views
+const PUBLIC_CACHE = 'public, max-age=120, stale-while-revalidate=600';
 
 /** Surfaces "try again in N seconds" to HTTP clients as a standard header. */
 const withRetryHeader = (res, err) => {
@@ -80,7 +80,7 @@ export async function franchise(req, res, next) {
   try {
     const { externalId } = parseOrThrow(franchiseParamsSchema, req.params, 'Invalid anime id.');
     const data = await getFranchiseSummary(externalId);
-    res.set('Cache-Control', 'public, max-age=300').json({ success: true, data });
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').json({ success: true, data });
   } catch (err) {
     next(withRetryHeader(res, err));
   }

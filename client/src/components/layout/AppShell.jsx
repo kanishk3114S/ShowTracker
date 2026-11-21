@@ -1,13 +1,11 @@
 import React, { lazy, Suspense, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { motion } from 'motion/react';
 import TopHeader from './TopHeader';
 import MobileNav from './MobileNav';
 import Footer from './Footer';
 import { SignInProvider } from '../auth/SignInContext';
 import { ToastProvider } from '../ui/Toast';
 import ErrorBoundary from '../common/ErrorBoundary';
-import { prefetchAllRoutesWhenIdle } from '../../routes/pages';
 
 // Optional extras are loaded lazily and fail quietly: if a content blocker (Brave Shields, uBlock, ...) stops one of
 // these files from loading, the rest of the app must still work.
@@ -22,11 +20,12 @@ const OfflineNotice = lazy(() => import('../common/OfflineNotice'));
  */
 export default function AppShell() {
   const location = useLocation();
+  const isFirstRender = React.useRef(true);
 
-  // After the first paint, quietly download every page's code so any click is instant.
   useEffect(() => {
-    prefetchAllRoutesWhenIdle();
+    isFirstRender.current = false;
   }, []);
+
   return (
     <SignInProvider>
       <ToastProvider>
@@ -38,13 +37,10 @@ export default function AppShell() {
             Skip to content
           </a>
           <TopHeader />
-          <motion.main
+          <main
             id="main"
             key={location.pathname}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-            className="flex-1 pb-24 md:pb-10"
+            className="flex-1 pb-24 md:pb-10 route-enter"
           >
             <Suspense
               fallback={
@@ -58,7 +54,7 @@ export default function AppShell() {
               <Outlet />
             </ErrorBoundary>
             </Suspense>
-          </motion.main>
+          </main>
           <Footer />
           <MobileNav />
           <ErrorBoundary fallback={null}>

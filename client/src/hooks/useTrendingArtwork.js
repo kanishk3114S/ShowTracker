@@ -42,14 +42,27 @@ export function useTrendingArtwork() {
 
   useEffect(() => {
     let alive = true;
-    load().then((result) => {
-      if (!alive) return;
-      setState(result);
-      setLoading(false);
-    });
-    return () => {
-      alive = false;
+    const trigger = () => {
+      load().then((result) => {
+        if (!alive) return;
+        setState(result);
+        setLoading(false);
+      });
     };
+
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(trigger, { timeout: 1500 });
+      return () => {
+        alive = false;
+        window.cancelIdleCallback(id);
+      };
+    } else {
+      const id = setTimeout(trigger, 300);
+      return () => {
+        alive = false;
+        clearTimeout(id);
+      };
+    }
   }, []);
 
   return { ...state, loading };

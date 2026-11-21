@@ -7,6 +7,25 @@ import { clearCache } from '../lib/queryCache';
 // It holds only what the page header already shows (name, avatar, username, privacy flags); never tokens.
 const PROFILE_CACHE_KEY = 'showtracker.profile.v1';
 
+/**
+ * Synchronous check whether this browser holds any Supabase session tokens in localStorage.
+ * If false, we can immediately initialize loading as false, avoiding an unnecessary skeleton
+ * state on the first paint for new/anonymous visitors.
+ */
+function hasStoredSession() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('sb-') || k.includes('auth-token'))) {
+        return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function readCachedProfile(userId) {
   try {
     const raw = JSON.parse(localStorage.getItem(PROFILE_CACHE_KEY) || 'null');
@@ -51,7 +70,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // If there are no auth tokens stored at all, start loading as false right away
+  const [loading, setLoading] = useState(hasStoredSession);
   const [error, setError] = useState(null);
   const lastUserId = useRef(null); // to notice an account switch
 
@@ -76,7 +96,9 @@ export function AuthProvider({ children }) {
 
     async function initializeAuth() {
       try {
-        setLoading(true);
+        if (hasStoredSession()) {
+          setLoading(true);
+        }
         const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {

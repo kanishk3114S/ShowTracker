@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
 import { ChevronDown, LogOut, Settings, UserRound, LayoutDashboard } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import { useAuth } from '../../hooks/useAuth';
@@ -58,16 +57,11 @@ export default function UserMenu() {
         <ChevronDown className={`hidden h-3.5 w-3.5 text-fg-subtle transition sm:block ${open ? 'rotate-180' : ''}`} aria-hidden="true" />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            role="menu"
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.98 }}
-            transition={{ duration: 0.14 }}
-            className="absolute right-0 top-full z-50 mt-2 w-64 origin-top-right rounded-xl border border-ink-edge bg-ink-raised p-1.5 shadow-lift"
-          >
+      {open && (
+        <div
+          role="menu"
+          className="animate-fade-in absolute right-0 top-full z-50 mt-2 w-64 origin-top-right rounded-xl border border-ink-edge bg-ink-raised p-1.5 shadow-lift"
+        >
             <div className="flex items-center gap-3 border-b border-ink-line px-3 pb-3 pt-2">
               <Avatar src={avatar} name={name} size="md" />
               <div className="min-w-0">
@@ -91,9 +85,8 @@ export default function UserMenu() {
                 <LogOut className="h-4 w-4" aria-hidden="true" /> Sign out
               </button>
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </div>
   );
 }

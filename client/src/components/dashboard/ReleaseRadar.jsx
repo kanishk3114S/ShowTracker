@@ -144,11 +144,11 @@ export default function ReleaseRadar({ compact = false, limit = 4 }) {
   const { data, error, loading, reload } = useResource(R.upcoming());
   // Use the server's clock, so a wrong device clock cannot show a wrong countdown.
   const offsetMs = useMemo(() => (data?.serverTime ? Date.parse(data.serverTime) - Date.now() : 0), [data]);
-  const now = useNow() + offsetMs;
+  const referenceMs = useMemo(() => Date.now() + offsetMs, [offsetMs]);
 
   const items = data?.items ?? [];
   const shown = compact ? items.slice(0, limit) : items;
-  const sections = useMemo(() => groupByAiringSection(shown, now), [shown, now]);
+  const sections = useMemo(() => groupByAiringSection(shown, referenceMs), [shown, referenceMs]);
 
   // The dashboard card stays out of the way: nothing to show (or still loading) means no card at all.
   if (compact && ((loading && !data) || (error && !data) || items.length === 0)) return null;

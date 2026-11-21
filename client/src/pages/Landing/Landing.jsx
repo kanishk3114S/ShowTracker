@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { motion } from 'motion/react';
 import { ArrowRight, BarChart3, Check, Compass, Eye, Library, Lock, Sparkles, Tv } from 'lucide-react';
 import Container from '../../components/layout/Container';
 import Button from '../../components/ui/Button';
@@ -19,28 +18,30 @@ function HeroCollage({ posters }) {
   if (picks.length < 6) return null;
   const columns = [picks.filter((_, i) => i % 3 === 0), picks.filter((_, i) => i % 3 === 1), picks.filter((_, i) => i % 3 === 2)];
   const offsets = ['mt-0', 'mt-14', 'mt-5'];
-  const drift = [-12, 14, -8];
+  // Use CSS keyframe animations for the float instead of Framer Motion's y
+  // keyframe loop — this avoids triggering a composite boundary issue inside
+  // the perspective container and keeps the animation on the GPU thread.
+  const driftClasses = ['animate-float-a', 'animate-float-b', 'animate-float-c'];
 
   return (
     <div className="relative mx-auto w-full max-w-md lg:max-w-none" aria-hidden="true">
       <div className="relative grid grid-cols-3 gap-3 [perspective:1400px] sm:gap-4">
         {columns.map((col, c) => (
-          <motion.div
+          <div
             key={c}
-            className={`space-y-3 [transform:rotateY(-14deg)_rotateX(5deg)] sm:space-y-4 ${offsets[c]}`}
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.15 * c, ease: [0.22, 1, 0.36, 1] }}
+            className={`space-y-3 [transform:rotateY(-14deg)_rotateX(5deg)] sm:space-y-4 ${offsets[c]} animate-fade-up`}
+            style={{ animationDelay: `${0.15 * c}s` }}
           >
-            <motion.div animate={{ y: [0, drift[c], 0] }} transition={{ duration: 9 + c * 2, repeat: Infinity, ease: 'easeInOut' }} className="space-y-3 sm:space-y-4">
+            {/* Float via CSS animation so it runs on the compositor thread */}
+            <div className={`space-y-3 sm:space-y-4 will-change-transform ${driftClasses[c]}`}>
               {col.map((m) => (
                 <div key={`${m.provider}:${m.externalId}`} className="relative">
                   <PosterImage src={m.posterUrl} alt="" className="aspect-[2/3] rounded-2xl border border-white/10 shadow-lift" />
                   <CategoryBadge type={m.mediaType} className="absolute left-2 top-2" />
                 </div>
               ))}
-            </motion.div>
-          </motion.div>
+            </div>
+          </div>
         ))}
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-ink-base to-transparent" />
@@ -151,35 +152,27 @@ export default function Landing() {
         <div className="bg-grid mask-radial pointer-events-none absolute inset-0 opacity-70" aria-hidden="true" />
         <Container className="relative grid items-center gap-12 py-14 sm:py-20 lg:grid-cols-[1.05fr_1fr] lg:py-24">
           <div>
-            <Reveal>
-              <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-semibold text-fg-muted">
-                <Sparkles className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
-                Anime · Movies · TV in one library
-              </span>
-            </Reveal>
-            <Reveal delay={0.05}>
-              <h1 className="text-5xl font-black leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
-                Your watchlist.
-                <br />
-                Your stories.
-                <br />
-                <span className="text-accent">Your universe.</span>
-              </h1>
-            </Reveal>
-            <Reveal delay={0.12}>
-              <p className="mt-6 max-w-xl text-lg leading-relaxed text-fg-muted">Track every anime, movie and series you love, all in one personal library.</p>
-            </Reveal>
-            <Reveal delay={0.18}>
-              <div className="mt-9 flex flex-wrap gap-3">
-                <Button variant="primary" size="lg" rightIcon={ArrowRight} onClick={openSignIn}>
-                  Start tracking
-                </Button>
-                <Button as={Link} to="/explore" variant="secondary" size="lg" leftIcon={Compass}>
-                  Explore titles
-                </Button>
-              </div>
-              <p className="mt-4 text-xs text-fg-subtle">Free to use. Sign in with Google. Your notes stay private.</p>
-            </Reveal>
+            <span className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-xs font-semibold text-fg-muted">
+              <Sparkles className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+              Anime · Movies · TV in one library
+            </span>
+            <h1 className="text-5xl font-black leading-[1.02] tracking-tight text-white sm:text-6xl lg:text-7xl">
+              Your watchlist.
+              <br />
+              Your stories.
+              <br />
+              <span className="text-accent">Your universe.</span>
+            </h1>
+            <p className="mt-6 max-w-xl text-lg leading-relaxed text-fg-muted">Track every anime, movie and series you love, all in one personal library.</p>
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Button variant="primary" size="lg" rightIcon={ArrowRight} onClick={openSignIn}>
+                Start tracking
+              </Button>
+              <Button as={Link} to="/explore" variant="secondary" size="lg" leftIcon={Compass}>
+                Explore titles
+              </Button>
+            </div>
+            <p className="mt-4 text-xs text-fg-subtle">Free to use. Sign in with Google. Your notes stay private.</p>
           </div>
           <Reveal delay={0.1}>
             <HeroCollage posters={posters} />

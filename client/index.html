@@ -28,14 +28,23 @@
     <link rel="preconnect" href="https://s4.anilist.co" crossorigin />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- DNS pre-resolution for Supabase auth and media CDNs -->
+    <link rel="dns-prefetch" href="https://uxjbiiurqmjghsdoqheb.supabase.co" />
+    <link rel="dns-prefetch" href="https://artworks.thetvdb.com" />
+    <link rel="dns-prefetch" href="https://api.anilist.co" />
+    <!-- Non-blocking font load: preload the CSS as a stylesheet only after render (font-display:swap prevents FOIT) -->
     <link
+      rel="preload"
+      as="style"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-      rel="stylesheet"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@600&text=%E3%80%8E%E3%80%8F%E7%89%A9%E8%AA%9E%E8%A8%98%E9%8C%B2%E6%9B%B8%E5%BA%AB&display=swap"
-      rel="stylesheet"
-    />
+    <noscript>
+      <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+      />
+    </noscript>
     <title>ShowTracker</title>
   </head>
   <body>

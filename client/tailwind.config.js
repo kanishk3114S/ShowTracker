@@ -67,6 +67,21 @@ export default {
           '0%, 100%': { transform: 'translateY(0)' },
           '50%': { transform: 'translateY(-10px)' }
         },
+        // Three independent float variants for the landing hero collage columns.
+        // Using CSS keyframes (not Framer Motion y-loop) keeps the animation
+        // on the GPU compositor thread inside the perspective container.
+        'float-a': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-12px)' }
+        },
+        'float-b': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(14px)' }
+        },
+        'float-c': {
+          '0%, 100%': { transform: 'translateY(0px)' },
+          '50%': { transform: 'translateY(-8px)' }
+        },
         twinkle: {
           '0%, 100%': { transform: 'scale(1) rotate(0deg)', filter: 'brightness(1)' },
           '50%': { transform: 'scale(1.18) rotate(12deg)', filter: 'brightness(1.4)' }
@@ -75,6 +90,14 @@ export default {
           '0%': { transform: 'scale(0.4)', opacity: '0' },
           '60%': { transform: 'scale(1.25)', opacity: '1' },
           '100%': { transform: 'scale(1)', opacity: '1' }
+        },
+        'fade-up': {
+          '0%': { opacity: '0', transform: 'translateY(16px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' }
         }
       },
       animation: {
@@ -82,8 +105,13 @@ export default {
         'ping-soft': 'ping-soft 1.8s cubic-bezier(0,0,0.2,1) infinite',
         sheen: 'sheen 0.9s ease-in-out',
         float: 'float 7s ease-in-out infinite',
+        'float-a': 'float-a 9s ease-in-out infinite',
+        'float-b': 'float-b 11s ease-in-out infinite',
+        'float-c': 'float-c 13s ease-in-out infinite',
         twinkle: 'twinkle 3.2s ease-in-out infinite',
-        'check-pop': 'check-pop 0.32s cubic-bezier(0.34,1.56,0.64,1) both'
+        'check-pop': 'check-pop 0.32s cubic-bezier(0.34,1.56,0.64,1) both',
+        'fade-up': 'fade-up 0.45s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'fade-in': 'fade-in 0.2s ease-out both'
       }
     }
   },

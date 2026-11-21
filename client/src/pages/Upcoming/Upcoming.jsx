@@ -238,7 +238,7 @@ export default function Upcoming() {
   const { data, error, loading, reload } = useResource(R.upcoming());
 
   const offsetMs = useMemo(() => (data?.serverTime ? Date.parse(data.serverTime) - Date.now() : 0), [data]);
-  const now = useNow() + offsetMs;
+  const referenceMs = useMemo(() => Date.now() + offsetMs, [offsetMs]);
 
   const allItems = data?.items ?? [];
 
@@ -247,7 +247,7 @@ export default function Upcoming() {
     return allItems.filter((it) => it.mediaType === typeFilter);
   }, [allItems, typeFilter]);
 
-  const sections = useMemo(() => groupUpcomingItems(filteredItems, now), [filteredItems, now]);
+  const sections = useMemo(() => groupUpcomingItems(filteredItems, referenceMs), [filteredItems, referenceMs]);
 
   return (
     <Container className="py-8 space-y-8">

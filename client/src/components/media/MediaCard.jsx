@@ -9,7 +9,7 @@ import { TYPE_LABELS, mediaPath } from './mediaUtils';
 import { useMediaPrefetch } from '../../hooks/usePrefetch';
 
 /** 2:3 poster card used by every grid. Lifts and glows in its category color on hover. */
-export default function MediaCard({ media }) {
+export default function MediaCard({ media, priority = false }) {
   const prefetchHandlers = useMediaPrefetch(media);
   const theme = TYPE_THEME[media.mediaType];
   return (
@@ -27,6 +27,7 @@ export default function MediaCard({ media }) {
           className="h-full w-full"
           imgClassName="transition-transform duration-500 ease-out group-hover:scale-105"
           fallbackLabel="No poster available"
+          priority={priority}
         />
         {/* lower-third vignette keeps titles legible */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/85 via-black/30 to-transparent" />

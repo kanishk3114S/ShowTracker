@@ -60,9 +60,16 @@ export function prefetchNav(pathname, isAuthenticated) {
   prefetchRouteData(pathname, isAuthenticated);
 }
 
-/** After the first paint, quietly download every page's code (they are small) so any click is instant. */
+/** After the page is fully interactive and genuinely idle, quietly download secondary pages. */
 export function prefetchAllRoutesWhenIdle() {
   const run = () => Object.values(pageLoaders).forEach((load) => load().catch(() => {}));
-  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(run, { timeout: 4000 });
-  else setTimeout(run, 2000);
+  // Wait until after the critical initialization window (8 seconds) so route prefetching
+  // never competes with initial render, first contentful paint, or user interactions.
+  if (typeof window.requestIdleCallback === 'function') {
+    setTimeout(() => {
+      window.requestIdleCallback(run, { timeout: 15000 });
+    }, 6000);
+  } else {
+    setTimeout(run, 8000);
+  }
 }

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
-import { motion } from 'motion/react';
 
 const VARIANTS = {
   // Solid gold with a hover sheen
@@ -24,38 +23,29 @@ const SIZES = {
  *  - loading: shows a spinner and blocks clicks
  *  - leftIcon / rightIcon: icon components (e.g. from lucide-react)
  *  - as: render as another element/component (e.g. Link) while keeping the styling
+ *
+ * Uses native CSS active:scale-[0.97] for instant hardware-accelerated tap feedback
+ * without any JavaScript gesture loop or Framer Motion main-thread overhead.
  */
-// One motion-wrapped component per element type, created once (a new one per render would remount the button).
-const motionTags = new Map();
-const motionFor = (Tag) => {
-  if (!motionTags.has(Tag)) motionTags.set(Tag, motion.create(Tag));
-  return motionTags.get(Tag);
-};
-const TAP = { scale: 0.97 };
-const TAP_SPRING = { type: 'spring', stiffness: 600, damping: 30 };
-
 const Button = React.forwardRef(function Button(
   { variant = 'secondary', size = 'md', loading = false, leftIcon: LeftIcon, rightIcon: RightIcon, as: Tag = 'button', className = '', disabled, children, ...rest },
   ref
 ) {
   const isButton = Tag === 'button';
   const blocked = disabled || loading;
-  const MotionTag = motionFor(Tag);
   return (
-    <MotionTag
+    <Tag
       ref={ref}
-      whileTap={blocked ? undefined : TAP}
-      transition={TAP_SPRING}
       {...(isButton ? { type: rest.type ?? 'button', disabled: blocked } : { 'aria-disabled': blocked || undefined })}
       {...rest}
-      className={`inline-flex select-none items-center justify-center whitespace-nowrap transition-[background-color,border-color,color,box-shadow,opacity] duration-200 ${
+      className={`inline-flex select-none items-center justify-center whitespace-nowrap active:scale-[0.97] transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-150 ease-out ${
         blocked ? 'pointer-events-none opacity-50' : ''
       } ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : LeftIcon && <LeftIcon className="h-4 w-4" aria-hidden="true" />}
       {children}
       {!loading && RightIcon && <RightIcon className="h-4 w-4" aria-hidden="true" />}
-    </MotionTag>
+    </Tag>
   );
 });
 

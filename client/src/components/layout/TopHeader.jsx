@@ -1,6 +1,5 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { motion } from 'motion/react';
 import Logo from '../ui/Logo';
 import Button from '../ui/Button';
 import UserMenu from './UserMenu';
@@ -52,10 +51,9 @@ export default function TopHeader() {
                   <>
                     {item.label}
                     {isActive && (
-                      <motion.span
-                        layoutId="header-active"
+                      <span
                         className="absolute inset-x-3 -bottom-[17px] h-0.5 rounded-full bg-accent"
-                        transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                        aria-hidden="true"
                       />
                     )}
                   </>

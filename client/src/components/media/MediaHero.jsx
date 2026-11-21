@@ -11,12 +11,16 @@ export const ghostFor = (media) => (media.mediaType === 'ANIME' ? '『物語』'
 
 export function HeroBackdrop({ media }) {
   const src = media.backdropUrl || media.posterUrl;
+  // Backdrop images are 1280×720; poster fallback is 342×513.
+  const isBackdrop = Boolean(media.backdropUrl);
   return (
     <div className="relative h-72 overflow-hidden bg-ink-surface sm:h-96" aria-hidden="true">
       {src && (
         <PosterImage
           src={src}
           alt=""
+          width={isBackdrop ? 1280 : 342}
+          height={isBackdrop ? 720 : 513}
           className="absolute inset-0 h-full w-full"
           imgClassName={media.backdropUrl ? 'opacity-60' : 'scale-125 object-top opacity-30 blur-2xl'}
           fallbackLabel=""

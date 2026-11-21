@@ -23,6 +23,11 @@ export default defineConfig({
   plugins: [react(), siteUrlPlugin],
   build: {
     sourcemap: false,
+    // Explicitly enable minification and CSS minification (should be on by default, but make it explicit)
+    minify: true,
+    cssMinify: true,
+    // Inline assets < 2 kB as data URIs to avoid extra network round-trips
+    assetsInlineLimit: 2048,
     chunkSizeWarningLimit: 500,
     rolldownOptions: {
       output: { codeSplitting: { groups: VENDOR_CHUNKS } },

@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import React, { useState, lazy, Suspense } from 'react';
 import { EyeOff, Lock, ShieldCheck } from 'lucide-react';
 import Button from '../ui/Button';
-import Modal from '../ui/Modal';
+
+const Modal = lazy(() => import('../ui/Modal'));
 
 export const CONSENT_KEY = 'showtracker_cookie_consent';
 
@@ -61,45 +61,43 @@ export default function StorageNotice() {
 
   return (
     <>
-      <AnimatePresence>
-        {visible && (
-          <motion.aside
-            role="region"
-            aria-label="Storage and privacy notice"
-            initial={{ y: 50, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: 30, opacity: 0, transition: { duration: 0.18 } }}
-            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
-            className="fixed inset-x-4 bottom-20 z-[60] rounded-2xl border border-white/10 bg-ink-surface/90 p-4 shadow-2xl backdrop-blur-xl md:inset-x-auto md:bottom-6 md:left-6 md:max-w-md"
-          >
-            <div className="flex gap-3">
-              <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-accent">
-                <ShieldCheck className="h-[18px] w-[18px]" aria-hidden="true" />
-              </span>
-              <p className="text-sm leading-relaxed text-fg-muted">
-                We use essential cookies and local storage to keep you signed in and preserve your personal library. No advertising or tracking cookies are used.
-              </p>
-            </div>
-            <div className="mt-3 flex items-center justify-end gap-2">
-              <Button size="sm" variant="ghost" onClick={() => setInfoOpen(true)}>
-                Privacy info
-              </Button>
-              <Button size="sm" variant="primary" onClick={accept}>
-                Got it
-              </Button>
-            </div>
-          </motion.aside>
-        )}
-      </AnimatePresence>
+      {visible && (
+        <aside
+          role="region"
+          aria-label="Storage and privacy notice"
+          className="animate-fade-up fixed inset-x-4 bottom-20 z-[60] rounded-2xl border border-white/10 bg-ink-surface/90 p-4 shadow-2xl backdrop-blur-xl md:inset-x-auto md:bottom-6 md:left-6 md:max-w-md"
+        >
+          <div className="flex gap-3">
+            <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.05] text-accent">
+              <ShieldCheck className="h-[18px] w-[18px]" aria-hidden="true" />
+            </span>
+            <p className="text-sm leading-relaxed text-fg-muted">
+              We use essential cookies and local storage to keep you signed in and preserve your personal library. No advertising or tracking cookies are used.
+            </p>
+          </div>
+          <div className="mt-3 flex items-center justify-end gap-2">
+            <Button size="sm" variant="ghost" onClick={() => setInfoOpen(true)}>
+              Privacy info
+            </Button>
+            <Button size="sm" variant="primary" onClick={accept}>
+              Got it
+            </Button>
+          </div>
+        </aside>
+      )}
 
-      <Modal open={infoOpen} onClose={() => setInfoOpen(false)} title="Your privacy on ShowTracker" description="What we store, and what stays yours.">
-        <PrivacyPoints />
-        <div className="mt-5 flex justify-end">
-          <Button variant="secondary" onClick={() => setInfoOpen(false)}>
-            Close
-          </Button>
-        </div>
-      </Modal>
+      {infoOpen && (
+        <Suspense fallback={null}>
+          <Modal open={infoOpen} onClose={() => setInfoOpen(false)} title="Your privacy on ShowTracker" description="What we store, and what stays yours.">
+            <PrivacyPoints />
+            <div className="mt-5 flex justify-end">
+              <Button variant="secondary" onClick={() => setInfoOpen(false)}>
+                Close
+              </Button>
+            </div>
+          </Modal>
+        </Suspense>
+      )}
     </>
   );
 }

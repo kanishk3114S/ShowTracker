@@ -183,7 +183,7 @@ export function LibraryRow({ entry, onChanged, onOptimistic, onRevert, onGroup }
 
   const identity = (
     <div className="flex min-w-0 items-center gap-3">
-      <PosterImage src={media.posterUrl} alt="" className={`h-16 w-11 shrink-0 rounded-lg border border-white/10 ring-1 ${theme.ring}`} fallbackLabel="" />
+      <PosterImage src={media.posterUrl} alt="" className={`h-16 w-11 shrink-0 rounded-lg border border-white/10 ring-1 ${theme.ring}`} width={92} height={138} fallbackLabel="" />
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-fg">{media.title}</p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-fg-subtle">
