@@ -43,7 +43,7 @@ function HeroCollage({ posters }) {
           </motion.div>
         ))}
       </div>
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-ink-base to-transparent" />
+      <div className="pointer-events-none absolute -inset-x-6 -bottom-10 h-1/2 bg-gradient-to-t from-ink-base via-ink-base/90 to-transparent" />
     </div>
   );
 }
